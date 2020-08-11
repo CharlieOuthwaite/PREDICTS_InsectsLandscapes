@@ -35,57 +35,55 @@ pred.data <- readRDS(paste0(datadir, "/database.rds")) # 3250404 rows
 # subset to the insects only
 pred.data <- pred.data[(pred.data$Class=="Insecta"),] # 935078
 
+# read in the predicts subset for pollinators
+pred.data.pols <- readRDS(paste0(datadir, "/PREDICTS_pollinators_5.rds")) # 372646 rows
+
+# subset to insect pollinators only
+pred.data.pols <- pred.data.pols[pred.data.pols$Class == "Insecta", ] # 292916 rows
+
+# read in the species lists  pest controllers
+pcs <- read.csv(paste0(datadir, "/pc_database.csv"))  # 4301 rows
+
+# select pest controllers that have a classification of 2c and above.
+pcs <- pcs[grep("2", pcs$Pest_control), ] # 1163 rows
+
+# create subset pest controllers (selecting from insect only subset)
+pred.data.pc <- pred.data[pred.data$Genus %in% pcs$Genus, ]  # 133988 rows
 
 
-# read in the species lists for pollinators and pest controllers
+### organise datasets using functions from predictsFunctions package ###
 
-polls <- 
-  
-pcs <- read.csv(paste0(datadir, "/pc_database.csv"))  
-
-
-# create subsets for pollinators and pestcontrollers
-pred.data.pol <- 
-  
-pred.data.pc <-   
-
-
-### organise using functions from predictsFunctions package ###
-
-#### 1. Insect subset  ####
-  
 # correct sampling effort 
 pred.data <- CorrectSamplingEffort(pred.data)
+pred.data.pols <- CorrectSamplingEffort(pred.data.pols)
+pred.data.pc <- CorrectSamplingEffort(pred.data.pc)
 
 # merge sites: this combines potential subsamples within one site
 pred.data <- MergeSites(pred.data) # 826525 rows
+pred.data.pols <- MergeSites(pred.data.pols[, 1:67]) # 278351 rows, doesn't work with additional columns
+pred.data.pc <- MergeSites(pred.data.pc) # 90177 rows
 
 # Calculate site level metrics
 pred.sites.metrics <- SiteMetrics(pred.data, extra.cols = c("Predominant_land_use", "SSB", "SSBS")) # 7800 rows
+pred.sites.metrics.pols <- SiteMetrics(pred.data.pols, extra.cols = c("Predominant_land_use", "SSB", "SSBS")) # 6087 rows
+pred.sites.metrics.pc <- SiteMetrics(pred.data.pc, extra.cols = c("Predominant_land_use", "SSB", "SSBS")) # 3497 rows
+
+
 
 # only interested in natural habitats plus cropland, drop other land uses #
-
 # site level data cropland only
 sites.sub <- pred.sites.metrics[!pred.sites.metrics$Predominant_land_use %in% c("Urban", "Pasture", "Cannot decide", "Plantation forest"), ]
+sites.sub.pols <- pred.sites.metrics.pols[!pred.sites.metrics.pols$Predominant_land_use %in% c("Urban", "Pasture", "Cannot decide", "Plantation forest"), ]
+sites.sub.pc <- pred.sites.metrics.pc[!pred.sites.metrics.pc$Predominant_land_use %in% c("Urban", "Pasture", "Cannot decide", "Plantation forest"), ]
+
+# 5120 rows
+# 4176 rows
+# 2437 rows
 
 # remove sites with NA in lat/long columns
 sites.sub <- sites.sub[!is.na(sites.sub$Longitude),  ] # 5115 rows
-
-
-#### 2. Pollinators subset ####
-
-
-
-
-
-
-#### 3. Pest controllers subset ####
-
-
-
-
-
-
+sites.sub.pols <- sites.sub.pols[!is.na(sites.sub.pols$Longitude),  ] # 4176 rows
+sites.sub.pc <- sites.sub.pc[!is.na(sites.sub.pc$Longitude),  ] # 2432 rows
 
 
 
@@ -95,6 +93,7 @@ sites.sub <- sites.sub[!is.na(sites.sub$Longitude),  ] # 5115 rows
 #                                                          #
 ############################################################
 
+## determine the forest biome for the all insecte sites, then match with the subsets
 
 # load the WWF ecoregions shapefile
 ecobio <- st_read(dsn = paste0(datadir, "/", "wwf_terr_ecos.shp"))
@@ -167,9 +166,12 @@ for(i in 1:length(vals)){
   else{pointsST_NA[pointsST_NA$SSBS == vals[i], 'Forest_biome'] <- NA}
 }
 
-pointsST_NA
 
-# check the NA ones manually on the map
+# check the remaining NAs on the map
+pointsST_NA[is.na(pointsST_NA$Forest_biome), ]
+mapview::mapview(pointsST_NA) + mapview::mapview(wwfbiomes)
+
+# just outside the boundary of biome 14
 pointsST_NA[rownames(pointsST_NA) == 3485, "Forest_biome"] <- 14
 pointsST_NA[rownames(pointsST_NA) == 3486, "Forest_biome"] <- 14
 pointsST_NA[rownames(pointsST_NA) == 3493, "Forest_biome"] <- 14
@@ -180,8 +182,9 @@ pointsST_NA[rownames(pointsST_NA) == 3494, "Forest_biome"] <- 14
 sites.sub[is.na(sites.sub$Forest_biome), "Forest_biome"] <- pointsST_NA$Forest_biome
 
 
-# sites per biome
-table(sites.sub$Forest_biome)
+### add in the forest biome to the data subsets 
+
+
 
 # subset to forest biomes only
 # forest biomes include 1:6 and 12
@@ -205,8 +208,7 @@ sites.sub$Forest_biome <- factor(sites.sub$Forest_biome,
                                           "Tropical & Subtropical Coniferous Forests", "Tropical & Subtropical Dry Broadleaf Forests",
                                           "Tropical & Subtropical Moist Broadleaf Forests"))
 
-
-
+sites.sub$SSBS <- as.factor(sites.sub$SSBS)
 
 
 ############################################################
@@ -445,6 +447,28 @@ sites.sub$percNH <- extract(percNH, sites.sub_xy, na.rm = FALSE)
 nrow(sites.sub[is.na(sites.sub$percNH),]) #3
 
 
+
+##%######################################################%##
+#                                                          #
+####             Pesticide application rate             ####
+#                                                          #
+##%######################################################%##
+
+
+# read in the raster
+pest_H <- raster(paste0(datadir,"/Pesticide_totalAPR_High.tif"))
+pest_L <- raster(paste0(datadir,"/Pesticide_totalAPR_Low.tif"))
+
+# extract the dataset info for the PREDICTS sites
+sites.sub$pest_H <- extract(pest_H, sites.sub_xy, na.rm = FALSE)
+sites.sub$pest_L <- extract(pest_L, sites.sub_xy, na.rm = FALSE)
+
+# how many NAs
+nrow(sites.sub[is.na(sites.sub$pest_H),]) #0
+nrow(sites.sub[is.na(sites.sub$pest_L),]) #0
+
+
+
 ##%######################################################%##
 #                                                          #
 ####                   Tropical sites                   ####
@@ -472,6 +496,29 @@ table(sites.sub$Tropical)
 
 
 
+##%######################################################%##
+#                                                          #
+####      Merge data subsets with site information      ####
+#                                                          #
+##%######################################################%##
+
+# all the data has now been added to the sites.sub dataset, now to merge
+# this with the pols and pc subsets
+
+# merge datasets to add in forest biomes for each site
+sites.sub.pols <- merge(sites.sub.pols, sites.sub, by = "SSBS", all.x = TRUE)
+sites.sub.pc <- merge(sites.sub.pc, sites.sub, by = "SSBS", all.x = TRUE)
+
+# remove duplicate columns
+sites.sub.pols <- sites.sub.pols[ , c(1:19, 38:55)]
+colnames(sites.sub.pols) <- sub(".x", "", colnames(sites.sub.pols) )
+sites.sub.pc <- sites.sub.pc[ , c(1:19, 38:55)]
+colnames(sites.sub.pc) <- sub(".x", "", colnames(sites.sub.pc) )
+
+
+
+
+
 
 ##%######################################################%##
 #                                                          #
@@ -482,23 +529,48 @@ table(sites.sub$Tropical)
 
 # remove any rows that have NA in the variable columns
 summary(is.na(sites.sub))
+summary(is.na(sites.sub.pols))
+summary(is.na(sites.sub.pc))
+
 
 # remove rows with NAs for any variable of interest
-sites.sub <- sites.sub[!is.na(sites.sub$Hansen_mindist), ] # 133 NAs 4212 rows
-sites.sub <- sites.sub[!is.na(sites.sub$homogen), ] # 45 NAs 4170 rows
+sites.sub <- sites.sub[!is.na(sites.sub$Hansen_mindist), ] # 133 NAs 
+sites.sub <- sites.sub[!is.na(sites.sub$homogen), ] # 45 NAs 
 sites.sub <- sites.sub[!is.na(sites.sub$percNH), ] # 3 NAs 4170 rows
 
-# nrows of dataset
-nrow(sites.sub) # 4170
+sites.sub.pols <- sites.sub.pols[!is.na(sites.sub.pols$Hansen_mindist), ] # 133 NAs 
+sites.sub.pols <- sites.sub.pols[!is.na(sites.sub.pols$homogen), ] # 44 NAs 
+sites.sub.pols <- sites.sub.pols[!is.na(sites.sub.pols$percNH), ] # 3 NAs 3337 rows
+
+sites.sub.pc <- sites.sub.pc[!is.na(sites.sub.pc$Hansen_mindist), ] # 133 NAs 
+sites.sub.pc <- sites.sub.pc[!is.na(sites.sub.pc$homogen), ] # 18 NAs 
+
+
 
 # remove those sites that have "Cannot decide" as a use intensity
-nrow(sites.sub[sites.sub$Use_intensity == "Cannot decide", ]) # 550
+nrow(sites.sub[sites.sub$Use_intensity == "Cannot decide", ]) # 549
 sites.sub <- sites.sub[!sites.sub$Use_intensity == "Cannot decide", ] 
+nrow(sites.sub.pols[sites.sub.pols$Use_intensity == "Cannot decide", ]) # 435
+sites.sub.pols <- sites.sub.pols[!sites.sub.pols$Use_intensity == "Cannot decide", ] 
+nrow(sites.sub.pc[sites.sub.pc$Use_intensity == "Cannot decide", ]) # 402
+sites.sub.pc <- sites.sub.pc[!sites.sub.pc$Use_intensity == "Cannot decide", ] 
 
-nrow(sites.sub) # 3620
+# nrows of dataset
+nrow(sites.sub) # 3621
+nrow(sites.sub.pols) # 2902
+nrow(sites.sub.pc) # 1454
 
 
-### checking correlations between variables ###
+
+
+
+
+##%######################################################%##
+#                                                          #
+####      checking correlations between variables       ####
+#                                                          #
+##%######################################################%##
+
 
 
 # function to create plot
@@ -509,10 +581,23 @@ panel.cor <- function(x, y, ...)
   text(0.5, 0.5, txt, cex = 2)
 }
 
+# save figure
+pdf(file = paste0(outdir, "/Correlations_all_variables.pdf"), width =14, height = 9)
 
-pdf(file = paste0(outdir, "/Correlations_all_insects.pdf"), width =14, height = 9)
 # correlations, including all nlandcovers buffers
-pairs(sites.sub[ , c(21:34)], 
+pairs(sites.sub[ , c(21:36)], 
+      upper.panel=panel.cor, 
+      diag.panel = panel.hist, 
+      main = "",
+      cex = 2)
+
+pairs(sites.sub.pols[ , c(21:36)], 
+      upper.panel=panel.cor, 
+      diag.panel = panel.hist, 
+      main = "",
+      cex = 2)
+
+pairs(sites.sub.pc[ , c(21:36)], 
       upper.panel=panel.cor, 
       diag.panel = panel.hist, 
       main = "",
@@ -520,18 +605,38 @@ pairs(sites.sub[ , c(21:34)],
 
 dev.off()
 
-pdf(file = paste0(outdir, "/Correlations_subset_insects.pdf"), width =11, height = 9)
-# correlations subset of variables, 5km landcpvers buffer only
-pairs(sites.sub[ , c(21:27, 32:34)], 
+
+
+# figure with reduced number of variables
+pdf(file = paste0(outdir, "/Correlations_reduced_variables.pdf"), width =11, height = 9)
+
+# correlations subset of variables, 5km landcovers buffer only, high pesticide estimates
+
+pairs(sites.sub[ , c(21:27, 32:35)], 
       upper.panel=panel.cor, 
       diag.panel = panel.hist, 
       main = "",
       cex.labels = 1.3)
+
+pairs(sites.sub.pols[ , c(21:27, 32:35)], 
+      upper.panel=panel.cor, 
+      diag.panel = panel.hist, 
+      main = "",
+      cex.labels = 1.3)
+
+pairs(sites.sub.pc[ , c(21:27, 32:35)], 
+      upper.panel=panel.cor, 
+      diag.panel = panel.hist, 
+      main = "",
+      cex.labels = 1.3)
+
 dev.off()
 
 
-# save the untransformed dataset including all variables
+# save the untransformed datasets including all variables
 save(sites.sub, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_INSECTS.rdata"))
+save(sites.sub.pols, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_POLS.rdata"))
+save(sites.sub.pc, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_PCS.rdata"))
 
 
 
@@ -544,14 +649,28 @@ save(sites.sub, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_INSECTS.r
 ##%######################################################%##
 
 # subset columns
-final.data <- sites.sub[, c(1,8:10, 14:35)]
+final.data <- sites.sub[, c(1,8:10, 14:37)]
+final.data.pols <- sites.sub.pols[, c(1,8:10, 14:37)]
+final.data.pc <- sites.sub.pc[, c(1,8:10, 14:37)]
 
 final.data.trans <- final.data
+final.data.trans.pols <- final.data.pols
+final.data.trans.pc <- final.data.pc
 
 
 # log transform some of the continuous variables where they are skewed
 final.data.trans$fert.total_log <-log(final.data.trans$fert.total+1) # there are 0s so +1
 final.data.trans$Hansen_mindist_log <-log(final.data.trans$Hansen_mindist+1) # there are 0s so +1
+final.data.trans$pest_H_log <-log(final.data.trans$pest_H+1) # there are 0s so +1
+
+final.data.trans.pols$fert.total_log <-log(final.data.trans.pols$fert.total+1) # there are 0s so +1
+final.data.trans.pols$Hansen_mindist_log <-log(final.data.trans.pols$Hansen_mindist+1) # there are 0s so +1
+final.data.trans.pols$pest_H_log <-log(final.data.trans.pols$pest_H+1) # there are 0s so +1
+
+final.data.trans.pc$fert.total_log <-log(final.data.trans.pc$fert.total+1) # there are 0s so +1
+final.data.trans.pc$Hansen_mindist_log <-log(final.data.trans.pc$Hansen_mindist+1) # there are 0s so +1
+final.data.trans.pc$pest_H_log <-log(final.data.trans.pc$pest_H+1) # there are 0s so +1
+
 
 # standardise all continuous variables
 final.data.trans$landcovers.5k <- scale(final.data.trans$landcovers.5k)
@@ -559,6 +678,25 @@ final.data.trans$homogen <- scale(final.data.trans$homogen)
 final.data.trans$fert.total_log <- scale(final.data.trans$fert.total_log)
 final.data.trans$Hansen_mindist_log <-scale(final.data.trans$Hansen_mindist_log)
 final.data.trans$percNH <-scale(final.data.trans$percNH)
+final.data.trans$ncrop <-scale(final.data.trans$ncrop)
+final.data.trans$pest_H_log <-scale(final.data.trans$pest_H_log)
+
+final.data.trans.pols$landcovers.5k <- scale(final.data.trans.pols$landcovers.5k)
+final.data.trans.pols$homogen <- scale(final.data.trans.pols$homogen)
+final.data.trans.pols$fert.total_log <- scale(final.data.trans.pols$fert.total_log)
+final.data.trans.pols$Hansen_mindist_log <-scale(final.data.trans.pols$Hansen_mindist_log)
+final.data.trans.pols$percNH <-scale(final.data.trans.pols$percNH)
+final.data.trans.pols$ncrop <-scale(final.data.trans.pols$ncrop)
+final.data.trans.pols$pest_H_log <-scale(final.data.trans.pols$pest_H_log)
+
+final.data.trans.pc$landcovers.5k <- scale(final.data.trans.pc$landcovers.5k)
+final.data.trans.pc$homogen <- scale(final.data.trans.pc$homogen)
+final.data.trans.pc$fert.total_log <- scale(final.data.trans.pc$fert.total_log)
+final.data.trans.pc$Hansen_mindist_log <-scale(final.data.trans.pc$Hansen_mindist_log)
+final.data.trans.pc$percNH <-scale(final.data.trans.pc$percNH)
+final.data.trans.pc$ncrop <-scale(final.data.trans.pc$ncrop)
+final.data.trans.pc$pest_H_log <-scale(final.data.trans.pc$pest_H_log)
+
 
 
 # get data sections for the scaling info for plotting later
@@ -567,7 +705,8 @@ landcovers.5k <- final.data.trans$landcovers.5k
 fert.total_log <- final.data.trans$fert.total_log
 homogen <- final.data.trans$homogen
 percNH <- final.data.trans$percNH
-
+ncrop <- final.data.trans$ncrop
+pest_H_log <- final.data.trans$pest_H_log
 
 # save the scaling values for projections
 h <- c("homogen", attr(homogen, "scaled:scale"), attr(homogen, "scaled:center"))
@@ -575,48 +714,98 @@ l <- c("landcovers.5k", attr(landcovers.5k, "scaled:scale"), attr(landcovers.5k,
 f <- c("fert.total_log", attr(fert.total_log, "scaled:scale"), attr(fert.total_log, "scaled:center"))
 d <- c("Hansen_mindist_log", attr(Hansen_mindist_log, "scaled:scale"), attr(Hansen_mindist_log, "scaled:center"))
 p <- c("percNH", attr(percNH, "scaled:scale"), attr(percNH, "scaled:center"))
+n <- c("ncrop", attr(ncrop, "scaled:scale"), attr(ncrop, "scaled:center"))
+c <- c("pest_H", attr(pest_H_log, "scaled:scale"), attr(pest_H_log, "scaled:center"))
 
-values <- rbind(d, f, l, h, p)
+values <- rbind(d, f, l, h, p, n, c)
 colnames(values) <- c("variable", "scale", "centre")
 
 #save
-write.csv(values, paste0(outdir, "/Scaling_values.csv"), row.names = FALSE)
+write.csv(values, paste0(outdir, "/Scaling_values_INSECTS.csv"), row.names = FALSE)
+
+
+
+# get data sections for the scaling info for plotting later
+Hansen_mindist_log <-final.data.trans.pols$Hansen_mindist_log
+landcovers.5k <- final.data.trans.pols$landcovers.5k
+fert.total_log <- final.data.trans.pols$fert.total_log
+homogen <- final.data.trans.pols$homogen
+percNH <- final.data.trans.pols$percNH
+ncrop <- final.data.trans.pols$ncrop
+pest_H_log <- final.data.trans.pols$pest_H_log
+
+# save the scaling values for projections
+h <- c("homogen", attr(homogen, "scaled:scale"), attr(homogen, "scaled:center"))
+l <- c("landcovers.5k", attr(landcovers.5k, "scaled:scale"), attr(landcovers.5k, "scaled:center"))
+f <- c("fert.total_log", attr(fert.total_log, "scaled:scale"), attr(fert.total_log, "scaled:center"))
+d <- c("Hansen_mindist_log", attr(Hansen_mindist_log, "scaled:scale"), attr(Hansen_mindist_log, "scaled:center"))
+p <- c("percNH", attr(percNH, "scaled:scale"), attr(percNH, "scaled:center"))
+n <- c("ncrop", attr(ncrop, "scaled:scale"), attr(ncrop, "scaled:center"))
+c <- c("pest_H", attr(pest_H_log, "scaled:scale"), attr(pest_H_log, "scaled:center"))
+
+values <- rbind(d, f, l, h, p, n, c)
+colnames(values) <- c("variable", "scale", "centre")
+
+#save
+write.csv(values, paste0(outdir, "/Scaling_values_POLS.csv"), row.names = FALSE)
+
+
+
+# get data sections for the scaling info for plotting later
+Hansen_mindist_log <-final.data.trans.pc$Hansen_mindist_log
+landcovers.5k <- final.data.trans.pc$landcovers.5k
+fert.total_log <- final.data.trans.pc$fert.total_log
+homogen <- final.data.trans.pc$homogen
+percNH <- final.data.trans.pc$percNH
+ncrop <- final.data.trans.pc$ncrop
+pest_H_log <- final.data.trans.pc$pest_H_log
+
+# save the scaling values for projections
+h <- c("homogen", attr(homogen, "scaled:scale"), attr(homogen, "scaled:center"))
+l <- c("landcovers.5k", attr(landcovers.5k, "scaled:scale"), attr(landcovers.5k, "scaled:center"))
+f <- c("fert.total_log", attr(fert.total_log, "scaled:scale"), attr(fert.total_log, "scaled:center"))
+d <- c("Hansen_mindist_log", attr(Hansen_mindist_log, "scaled:scale"), attr(Hansen_mindist_log, "scaled:center"))
+p <- c("percNH", attr(percNH, "scaled:scale"), attr(percNH, "scaled:center"))
+n <- c("ncrop", attr(ncrop, "scaled:scale"), attr(ncrop, "scaled:center"))
+c <- c("pest_H", attr(pest_H_log, "scaled:scale"), attr(pest_H_log, "scaled:center"))
+
+values <- rbind(d, f, l, h, p, n, c)
+colnames(values) <- c("variable", "scale", "centre")
+
+#save
+write.csv(values, paste0(outdir, "/Scaling_values_PC.csv"), row.names = FALSE)
+
+
+
 
 
 ### organise factor levels ###
 
 # drop unused levels of factors
 final.data.trans <- droplevels(final.data.trans)
+final.data.trans.pols <- droplevels(final.data.trans.pols)
+final.data.trans.pc <- droplevels(final.data.trans.pc)
 
 # set factor levels in the best order
 final.data.trans$Use_intensity <- relevel(final.data.trans$Use_intensity, ref = "Minimal use")
+final.data.trans.pols$Use_intensity <- relevel(final.data.trans.pols$Use_intensity, ref = "Minimal use")
+final.data.trans.pc$Use_intensity <- relevel(final.data.trans.pc$Use_intensity, ref = "Minimal use")
 
 # nsites per use intensity
 table(final.data.trans$Use_intensity)
+table(final.data.trans.pols$Use_intensity)
+table(final.data.trans.pc$Use_intensity)
 
 
-# set the forest biome to names rather than numbers
-final.data.trans$Forest_biome <- sub(12, "Mediterranean Forests, Woodlands & Scrub", final.data.trans$Forest_biome)
-final.data.trans$Forest_biome <- sub(1, "Tropical & Subtropical Moist Broadleaf Forests", final.data.trans$Forest_biome)
-final.data.trans$Forest_biome <- sub(2, "Tropical & Subtropical Dry Broadleaf Forests", final.data.trans$Forest_biome)
-final.data.trans$Forest_biome <- sub(3, "Tropical & Subtropical Coniferous Forests", final.data.trans$Forest_biome)
-final.data.trans$Forest_biome <- sub(4, "Temperate Broadleaf & Mixed Forests", final.data.trans$Forest_biome)
-final.data.trans$Forest_biome <- sub(5, "Temperate Conifer Forests", final.data.trans$Forest_biome)
-final.data.trans$Forest_biome <- sub(6, "Boreal Forests/Taiga", final.data.trans$Forest_biome)
-
-
-
-final.data.trans$Forest_biome <- factor(final.data.trans$Forest_biome,
-                                        levels=c("Temperate Broadleaf & Mixed Forests", "Temperate Conifer Forests",
-                                                 "Boreal Forests/Taiga", "Mediterranean Forests, Woodlands & Scrub",
-                                                 "Tropical & Subtropical Coniferous Forests", 
-                                                 "Tropical & Subtropical Dry Broadleaf Forests",
-                                                 "Tropical & Subtropical Moist Broadleaf Forests"))
 # nsites per biome
 table(final.data.trans$Forest_biome)
+table(final.data.trans.pols$Forest_biome)
+table(final.data.trans.pc$Forest_biome)
 
 # set land use as character variable
 final.data.trans$Predominant_land_use <- as.character(final.data.trans$Predominant_land_use)
+final.data.trans.pols$Predominant_land_use <- as.character(final.data.trans.pols$Predominant_land_use)
+final.data.trans.pc$Predominant_land_use <- as.character(final.data.trans.pc$Predominant_land_use)
 
 
 # combine secondary land uses
@@ -625,79 +814,67 @@ final.data.trans$Predominant_land_use <- sub("Intermediate secondary vegetation"
 final.data.trans$Predominant_land_use <- sub("Young secondary vegetation", "Secondary vegetation", final.data.trans$Predominant_land_use)
 final.data.trans[final.data.trans$Predominant_land_use == "Secondary vegetation (indeterminate age)", 'Predominant_land_use'] <- "Secondary vegetation"
 
+final.data.trans.pols$Predominant_land_use <- sub("Mature secondary vegetation", "Secondary vegetation", final.data.trans.pols$Predominant_land_use)
+final.data.trans.pols$Predominant_land_use <- sub("Intermediate secondary vegetation", "Secondary vegetation", final.data.trans.pols$Predominant_land_use)
+final.data.trans.pols$Predominant_land_use <- sub("Young secondary vegetation", "Secondary vegetation", final.data.trans.pols$Predominant_land_use)
+final.data.trans.pols[final.data.trans.pols$Predominant_land_use == "Secondary vegetation (indeterminate age)", 'Predominant_land_use'] <- "Secondary vegetation"
+
+final.data.trans.pc$Predominant_land_use <- sub("Mature secondary vegetation", "Secondary vegetation", final.data.trans.pc$Predominant_land_use)
+final.data.trans.pc$Predominant_land_use <- sub("Intermediate secondary vegetation", "Secondary vegetation", final.data.trans.pc$Predominant_land_use)
+final.data.trans.pc$Predominant_land_use <- sub("Young secondary vegetation", "Secondary vegetation", final.data.trans.pc$Predominant_land_use)
+final.data.trans.pc[final.data.trans.pc$Predominant_land_use == "Secondary vegetation (indeterminate age)", 'Predominant_land_use'] <- "Secondary vegetation"
+
+
 table(final.data.trans$Predominant_land_use)
+table(final.data.trans.pols$Predominant_land_use)
+table(final.data.trans.pc$Predominant_land_use)
 
 
 # set factor levels of predominant land use
 final.data.trans$Predominant_land_use <- factor(final.data.trans$Predominant_land_use,
                                                 levels=c("Primary vegetation","Secondary vegetation", "Cropland"))
+final.data.trans.pols$Predominant_land_use <- factor(final.data.trans.pols$Predominant_land_use,
+                                                levels=c("Primary vegetation","Secondary vegetation", "Cropland"))
+final.data.trans.pc$Predominant_land_use <- factor(final.data.trans.pc$Predominant_land_use,
+                                                levels=c("Primary vegetation","Secondary vegetation", "Cropland"))
 
 
 # nsites per land use
 table(final.data.trans$Predominant_land_use)
+table(final.data.trans.pols$Predominant_land_use)
+table(final.data.trans.pc$Predominant_land_use)
 
 
-pdf(file = paste0(outdir, "/Correlations_final_variables_INSECTS.pdf"), width =9, height = 9)
+pdf(file = paste0(outdir, "/Correlations_final_variables.pdf"), width =9, height = 9)
 # correlations of final set of variables - transformed
-pairs(final.data.trans[ , c(23:25, 27:28)], 
+pairs(final.data.trans[ , c(16, 23:25, 29:31)], 
       upper.panel=panel.cor, 
       diag.panel = panel.hist, 
       main = "",
       cex.labels = 1.3)
+
+pairs(final.data.trans.pols[ , c(16, 23:25, 29:31)], 
+      upper.panel=panel.cor, 
+      diag.panel = panel.hist, 
+      main = "",
+      cex.labels = 1.3)
+
+pairs(final.data.trans.pc[ , c(16, 23:25, 29:31)], 
+      upper.panel=panel.cor, 
+      diag.panel = panel.hist, 
+      main = "",
+      cex.labels = 1.3)
+
 dev.off()
 
 
 
 # save transformed dataset
-save(final.data.trans, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_TRANS_INSECTS.rdata"))
+save(final.data.trans, file = paste0(outdir, "/PREDICTS_dataset_TRANS_INSECTS.rdata"))
+save(final.data.trans.pols, file = paste0(outdir, "/PREDICTS_dataset_TRANS_POLS.rdata"))
+save(final.data.trans.pc, file = paste0(outdir, "/PREDICTS_dataset_TRANS_INSECTS_PC.rdata"))
 
 
-
-
-##%######################################################%##
-#                                                          #
-####                  Dataset subsets                   ####
-#                                                          #
-##%######################################################%##
-
-# Subsets of the data required for the abundance models and the range size models
-
-## abundance subset
-final.data.abun <- final.data.trans[!is.na(final.data.trans$Total_abundance), ] # 3385 rows
-
-# log the abundance values
-final.data.abun$logAbun <- log(final.data.abun$Total_abundance+1)
-
-
-# Incorporate the RCAR data
-
-# Set the path to your local copy of the database
-predicts.path <- paste0(datadir, "/PREDICTS_Sites_Mean_RangeSizes.rds")
-
-# Read in the PREDICTS data
-predicts <- ReadPREDICTS(predicts.path)
-
-# Use unique SSBS values to match up the two datasets.
-final.data.rcar<- merge(final.data.trans, predicts, by = "SSBS", all.x= T)
-
-# how many of these have values
-sum(!is.na(final.data.rcar$RCAR_110km)) # 2404
-
-# remove duplicated columns
-final.data.rcar <- final.data.rcar[ , c(1:28, 37)]
-
-# remove NAs
-final.data.rcar <- final.data.rcar[!is.na(final.data.rcar$RCAR_110km), ] # 2404 rows
-
-# remove the .x from column names
-colnames(final.data.rcar) <- sub(".x", "", colnames(final.data.rcar))
-
-final.data.abun <- droplevels(final.data.abun)
-final.data.rcar <- droplevels(final.data.rcar)
-
-# save
-save(final.data.abun, file = paste0(outdir, "/PREDICTS_abun_subset_INSECTS.rdata"))
-save(final.data.rcar, file = paste0(outdir, "/PREDICTS_rcar_subset_INSECTS.rdata"))
 
 
 
@@ -710,13 +887,13 @@ save(final.data.rcar, file = paste0(outdir, "/PREDICTS_rcar_subset_INSECTS.rdata
 # get the number of studies, sites, etc for the paper
 
 length(unique(final.data.trans$SS)) # 209 studies
-nrow(final.data.trans) # 3620 sites
+nrow(final.data.trans) # 3621 sites
 
-length(unique(final.data.abun$SS)) # 192 studies
-nrow(final.data.abun) # 3385 sites
+length(unique(final.data.trans.pols$SS)) # 142 studies
+nrow(final.data.trans.pols) # 2902 sites
 
-length(unique(final.data.rcar$SS)) # 133 studies
-nrow(final.data.rcar) # 2404 sites
+length(unique(final.data.pc$SS)) # 99 studies
+nrow(final.data.pc) # 1454 sites
 
 
 
