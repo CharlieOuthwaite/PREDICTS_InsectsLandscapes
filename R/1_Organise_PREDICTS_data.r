@@ -934,7 +934,7 @@ ecobio$BIOME <- sub(1, "Tropical & Subtropical Moist Broadleaf Forests", ecobio$
 ecobio$BIOME <- sub(2, "Tropical & Subtropical Dry Broadleaf Forests", ecobio$BIOME)
 ecobio$BIOME <- sub(3, "Tropical & Subtropical Coniferous Forests", ecobio$BIOME)
 ecobio$BIOME <- sub(4, "Temperate Broadleaf & Mixed Forests", ecobio$BIOME)
-ecobio$BIOME<- sub(5, "Temperate Conifer Forests", ecobio$BIOME)
+ecobio$BIOME <- sub(5, "Temperate Conifer Forests", ecobio$BIOME)
 ecobio$BIOME <- sub(6, "Boreal Forests/Taiga", ecobio$BIOME)
 
 
@@ -948,9 +948,10 @@ n = length(unique(ecobio$BIOME))
 ggplot()+
   geom_map(data=map.world, map=map.world,
            aes(x=long, y=lat, group=group, map_id=region),
-           fill= "lightgrey", colour="lightgrey", size=0.2) +
-  geom_sf(data = ecobio, aes(fill = BIOME), alpha = 0.7, col = NA) +
+           fill= c("#7CCD7C"), colour= "transparent", size=0.2, alpha = 0.5) +
+  geom_sf(data = ecobio,  aes(fill = BIOME), alpha = 1, col = NA) +
   geom_point(data = nsites, aes(x = lon, y = lat, size = nsites), col = c("#0F0F0F"), alpha = 0.5) +
+  #geom_polygon(data = wwfbiomes, x = )
   theme(panel.grid.major = element_line(colour = "transparent"), 
         panel.background = element_blank(),
         legend.position = "bottom",
