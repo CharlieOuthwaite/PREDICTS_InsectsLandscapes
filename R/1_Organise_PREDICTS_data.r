@@ -956,6 +956,7 @@ ggplot()+
         panel.background = element_blank(),
         legend.position = "bottom",
         legend.title = element_blank(),
+        legend.key = element_blank(),
         text = element_text(size = 16)) +
   xlab("") +
   ylab("") +
