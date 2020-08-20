@@ -872,7 +872,7 @@ dev.off()
 # save transformed dataset
 save(final.data.trans, file = paste0(outdir, "/PREDICTS_dataset_TRANS_INSECTS.rdata"))
 save(final.data.trans.pols, file = paste0(outdir, "/PREDICTS_dataset_TRANS_POLS.rdata"))
-save(final.data.trans.pc, file = paste0(outdir, "/PREDICTS_dataset_TRANS_INSECTS_PC.rdata"))
+save(final.data.trans.pc, file = paste0(outdir, "/PREDICTS_dataset_TRANS_PC.rdata"))
 
 
 
