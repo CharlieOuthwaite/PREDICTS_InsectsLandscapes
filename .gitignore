@@ -19,6 +19,8 @@
 
 # RStudio files
 .Rproj.user/
+.Rproj
+PREDICTS_INsectsLandscapes.Rproj
 
 # produced vignettes
 vignettes/*.html
@@ -37,3 +39,11 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+.Rproj.user
+
+
+# ignore folders created by scripts
+Data
+1_PREDICTS_PLUS_VARIABLES
+2_MODEL_SELECTION
+3_FIGURES
