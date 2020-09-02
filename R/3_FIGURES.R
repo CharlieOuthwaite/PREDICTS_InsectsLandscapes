@@ -863,3 +863,459 @@ r[[3]]<- ggplot(data = result) +
 r[[3]] <- ggplotGrob(r[[3]])
 
 
+# organise plots
+plots <- plot_grid(plotlist = r, ncol = 2)
+
+save_plot(filename = paste0(outdir, "/INSECTS_all_plots_AB.pdf"), plot = plots, base_height = 12, base_width = 8)
+
+
+
+
+
+
+##%######################################################%##
+#                                                          #
+####                2. Pollinators plots                ####
+#                                                          #
+##%######################################################%##
+
+
+
+
+# load the models
+load(paste0(datadir, "/SRMOD_output_POLLINATORS.rdata")) # srmod_PO2
+load(paste0(datadir, "/SRMOD_output_POLLINATORS_ncrop.rdata")) # srmod_PO
+
+# load the dataset
+load(paste0(datadir2, "/PREDICTS_dataset_TRANS_POLS.rdata"))
+
+# load the scalers
+scalers_pols <- read.csv(paste0(datadir2, "/Scaling_values_POLS.csv"))
+
+
+##### ncrops model SR results #####
+
+
+#### land use - use intensity interactions ####
+
+
+# basic table of median values and reference factors
+pred_tab <- data.frame(ncrop = median(final.data.trans.pols$ncrop),
+                       percNH = median(final.data.trans.pols$percNH),
+                       #Forest_biome = "Temperate Broadleaf & Mixed Forests",
+                       Use_intensity = "Minimal use",
+                       Predominant_land_use = "Primary vegetation",
+                       #Tropical = "Temperate",
+                       Species_richness = 0,
+                       logAbun = 0)
+
+
+# organise factor levels
+# check levels of factor variables
+levels(pred_tab$Predominant_land_use) <- levels(srmod_PO$data$Predominant_land_use)
+levels(pred_tab$Use_intensity) <- levels(srmod_PO$data$Use_intensity) 
+#levels(pred_tab$Forest_biome) <- levels(srmod_IN$data$Forest_biome) 
+#levels(pred_tab$Tropical) <- levels(srmod_IN$data$Tropical) 
+
+# add and change factor levels of land use and intensity
+
+pred_tab <- do.call("rbind", replicate(9, pred_tab, simplify = FALSE))
+
+pred_tab[4:6, 'Predominant_land_use'] <- "Secondary vegetation"
+pred_tab[7:9, 'Predominant_land_use'] <- "Cropland"
+
+pred_tab[c(2,5,8), 'Use_intensity'] <- "Light use"
+pred_tab[c(3,6,9), 'Use_intensity'] <- "Intense use"
+
+
+#### SR predictions ####
+
+
+# predict the result
+result <- PredictGLMERRandIter(model = srmod_PO$model, data = pred_tab)
+
+# transform the results
+result <- exp(result)
+
+result <- sweep(x = result,MARGIN = 2,STATS = result[1,],FUN = '/')
+
+result.median <- ((apply(X = result,MARGIN = 1,FUN = median))*100)-100
+result.upper <- ((apply(X = result,MARGIN = 1,FUN = quantile,probs = 0.975))*100)-100
+result.lower <- ((apply(X = result,MARGIN = 1,FUN = quantile,probs = 0.025))*100)-100
+
+
+
+## SR
+
+# colours
+errbar.cols <- c(rep("#006400",3),rep("#8B0000", 3), rep("#EEAD0E", 3))
+
+
+errbar(x = 1:9,y = result.median,yplus = result.upper,yminus = result.lower,
+       col=errbar.cols,errbar.col = errbar.cols,
+       ylim=c(min(result.lower),80),xaxt="n",
+       pch =rep(c(16,17,18), 3), 
+       ylab="Species Richness (%)",xlab="",bty="l")
+
+
+axis(side = 1,at = c(2,5,8),
+     labels = c("Primary \nvegetation","Secondary\nvegetation", "Cropland"),
+     padj = 0.5)
+
+abline(h=0,col="#00000077",lty=2)
+
+legend("topleft", 
+       legend = c("Minimal Use", "Light Use", "Intense Use"),
+       pch = c(16,17,18), bty = "n", inset=c(0,0))
+
+
+
+# list to save plots in
+p <- list()
+
+p[[1]] <- recordPlot()
+
+
+### percNH ###
+
+# basic table of median values and reference factors
+pred_tab <- data.frame(ncrop = median(final.data.trans.pols$ncrop),
+                       percNH = median(final.data.trans.pols$percNH),
+                       #Forest_biome = "Temperate Broadleaf & Mixed Forests",
+                       Use_intensity = "Minimal use",
+                       Predominant_land_use = "Primary vegetation",
+                       #Tropical = "Temperate",
+                       Species_richness = 0,
+                       logAbun = 0)
+
+levels(pred_tab$Predominant_land_use) <- levels(srmod_PO$data$Predominant_land_use)
+levels(pred_tab$Use_intensity) <- levels(srmod_PO$data$Use_intensity) 
+#levels(pred_tab$Forest_biome) <- levels(srmod_PO$data$Forest_biome) 
+#levels(pred_tab$Tropical) <- levels(srmod_PO$data$Tropical) 
+
+# save this basic table for later use
+base_pred_tab <- pred_tab
+
+from = 0
+to = 100
+vals <- seq(from = from, to = to, length.out = 1000)
+variable <- 'percNH'
+logval = F
+fac <- NULL
+n <- NULL
+
+# transform the values
+vals_trans <- sapply(vals, 
+                     FUN = rescale, 
+                     centre = scalers_pols[scalers_pols$variable == variable, 'centre'], 
+                     scale = scalers_pols[scalers_pols$variable == variable, 'scale'],
+                     logval = logval)
+
+
+# add reps of pred_tab and add the new variable vals
+pred_tab <- do.call("rbind", replicate(length(vals), pred_tab, simplify = FALSE))
+
+# replace the variable of interest with the new ones
+pred_tab[,variable] <- vals_trans
+
+
+# predict the result
+result <- PredictGLMER(model = srmod_PO$model, data = pred_tab, se.fit = TRUE, seMultiplier = 1.96)
+
+# transform the results
+result <- exp(result)
+
+## organise data for plotting ##
+percNH <- as.data.frame(unscale(final.data.trans.pols$percNH, scale = scalers_pols[5, 2], centre = scalers_pols[5, 3], log = F))
+
+# SR plot = full range
+p[[2]]<- ggplot(data = result) +
+  geom_line(aes(x = vals, y = y), col = c("#66CD00")) +
+  geom_ribbon(aes(x = vals, ymin= yminus, ymax = yplus), fill = c("#66CD00"), alpha = 0.3) +
+  geom_rug(data = percNH, aes(x = V1), size = 0.1) +
+  ylim(c(0,15)) +
+  xlim(c(0, 100)) +
+  xlab("Percentage of Natural Habitat") +
+  ylab("Species Richness") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8,0.8), legend.title = element_blank(),
+        aspect.ratio = 1) +
+  ggtitle("Pollinators")
+
+p[[2]] <- ggplotGrob(p[[2]])
+
+
+
+### ncrop ###
+
+pred_tab <- base_pred_tab
+
+from = 0
+to = 123
+vals <- seq(from = from, to = to, length.out = 1000)
+variable <- 'ncrop'
+logval = F
+fac <- NULL
+n <- NULL
+
+# transform the values
+vals_trans <- sapply(vals, 
+                     FUN = rescale, 
+                     centre = scalers_pols[scalers_pols$variable == variable, 'centre'], 
+                     scale = scalers_pols[scalers_pols$variable == variable, 'scale'],
+                     logval = logval)
+
+
+# add reps of pred_tab and add the new variable vals
+pred_tab <- do.call("rbind", replicate(length(vals), pred_tab, simplify = FALSE))
+
+# replace the variable of interest with the new ones
+pred_tab[,variable] <- vals_trans
+
+
+# predict the result
+result <- PredictGLMER(model = srmod_PO$model, data = pred_tab, se.fit = TRUE, seMultiplier = 1.96)
+
+# transform the results
+result <- exp(result)
+
+## organise data for plotting ##
+ncrop <- as.data.frame(unscale(final.data.trans.pols$ncrop, scale = scalers_pols[6, 2], centre = scalers_pols[6, 3], log = F))
+
+# SR plot = full range
+p[[3]]<- ggplot(data = result) +
+  geom_line(aes(x = vals, y = y), col = c("#CD6600")) +
+  geom_ribbon(aes(x = vals, ymin= yminus, ymax = yplus), fill = c("#CD6600"), alpha = 0.3) +
+  geom_rug(data = ncrop, aes(x = V1), size = 0.1) +
+  ylim(c(0,15)) +
+  xlim(c(0, 130)) +
+  xlab("Number of crops") +
+  ylab("Species Richness") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8,0.8), legend.title = element_blank(),
+        aspect.ratio = 1) +
+  ggtitle("Pollinators")
+
+p[[3]] <- ggplotGrob(p[[3]])
+
+
+# organise plots
+plots <- plot_grid(plotlist = p, ncol = 2)
+
+save_plot(filename = paste0(outdir, "/POLLINATORS_all_plots_ncrop_SR.pdf"), plot = plots, base_height = 8, base_width = 8)
+
+
+
+#####################################################################################################################################
+
+### pest_H model SR results ###
+
+#### land use - use intensity interactions ####
+
+
+# basic table of median values and reference factors
+pred_tab <- data.frame(
+  #ncrop = median(final.data.trans.pols$ncrop),
+  percNH = median(final.data.trans.pols$percNH),
+  #Forest_biome = "Temperate Broadleaf & Mixed Forests",
+  Use_intensity = "Minimal use",
+  Predominant_land_use = "Primary vegetation",
+  #Tropical = "Temperate",
+  Species_richness = 0,
+  logAbun = 0)
+
+
+# organise factor levels
+# check levels of factor variables
+levels(pred_tab$Predominant_land_use) <- levels(srmod_PO2$data$Predominant_land_use)
+levels(pred_tab$Use_intensity) <- levels(srmod_PO2$data$Use_intensity) 
+#levels(pred_tab$Forest_biome) <- levels(srmod_IN$data$Forest_biome) 
+#levels(pred_tab$Tropical) <- levels(srmod_IN$data$Tropical) 
+
+# add and change factor levels of land use and intensity
+
+pred_tab <- do.call("rbind", replicate(9, pred_tab, simplify = FALSE))
+
+pred_tab[4:6, 'Predominant_land_use'] <- "Secondary vegetation"
+pred_tab[7:9, 'Predominant_land_use'] <- "Cropland"
+
+pred_tab[c(2,5,8), 'Use_intensity'] <- "Light use"
+pred_tab[c(3,6,9), 'Use_intensity'] <- "Intense use"
+
+
+#### SR predictions ####
+
+
+# predict the result
+result <- PredictGLMERRandIter(model = srmod_PO2$model, data = pred_tab)
+
+# transform the results
+result <- exp(result)
+
+result <- sweep(x = result,MARGIN = 2,STATS = result[1,],FUN = '/')
+
+result.median <- ((apply(X = result,MARGIN = 1,FUN = median))*100)-100
+result.upper <- ((apply(X = result,MARGIN = 1,FUN = quantile,probs = 0.975))*100)-100
+result.lower <- ((apply(X = result,MARGIN = 1,FUN = quantile,probs = 0.025))*100)-100
+
+
+
+# colours
+errbar.cols <- c(rep("#006400",3),rep("#8B0000", 3), rep("#EEAD0E", 3))
+
+
+errbar(x = 1:9,y = result.median,yplus = result.upper,yminus = result.lower,
+       col=errbar.cols,errbar.col = errbar.cols,
+       ylim=c(min(result.lower),80),xaxt="n",
+       pch =rep(c(16,17,18), 3), 
+       ylab="Species Richness (%)",xlab="",bty="l")
+
+
+axis(side = 1,at = c(2,5,8),
+     labels = c("Primary \nvegetation","Secondary\nvegetation", "Cropland"),
+     padj = 0.5)
+
+abline(h=0,col="#00000077",lty=2)
+
+legend("topleft", 
+       legend = c("Minimal Use", "Light Use", "Intense Use"),
+       pch = c(16,17,18), bty = "n", inset=c(0,0))
+
+
+
+
+# list to save plots in
+q <- list()
+
+q[[1]] <- recordPlot()
+
+
+### percNH ###
+
+
+from = 0
+to = 100
+vals <- seq(from = from, to = to, length.out = 1000)
+variable <- 'percNH'
+logval = F
+fac <- NULL
+n <- NULL
+
+# transform the values
+vals_trans <- sapply(vals, 
+                     FUN = rescale, 
+                     centre = scalers_pols[scalers_pols$variable == variable, 'centre'], 
+                     scale = scalers_pols[scalers_pols$variable == variable, 'scale'],
+                     logval = logval)
+
+
+# add reps of pred_tab and add the new variable vals
+pred_tab <- do.call("rbind", replicate(length(vals), base_pred_tab, simplify = FALSE))
+
+# replace the variable of interest with the new ones
+pred_tab[,variable] <- vals_trans
+
+
+# predict the result
+result <- PredictGLMER(model = srmod_PO2$model, data = pred_tab, se.fit = TRUE, seMultiplier = 1.96)
+
+# transform the results
+result <- exp(result)
+
+## organise data for plotting ##
+percNH <- as.data.frame(unscale(final.data.trans.pols$percNH, scale = scalers_ins[5, 2], centre = scalers_ins[5, 3], log = F))
+
+# SR plot = full range
+q[[2]]<- ggplot(data = result) +
+  geom_line(aes(x = vals, y = y), col = c("#66CD00")) +
+  geom_ribbon(aes(x = vals, ymin= yminus, ymax = yplus), fill = c("#66CD00"), alpha = 0.3) +
+  geom_rug(data = percNH, aes(x = V1), size = 0.1) +
+  ylim(c(0,15)) +
+  xlim(c(0, 100)) +
+  xlab("Percentage of Natural Habitat") +
+  ylab("Species Richness") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.8,0.8), legend.title = element_blank(),
+        aspect.ratio = 1) +
+  ggtitle("Pollinators")
+
+q[[2]] <- ggplotGrob(q[[2]])
+
+
+# organise plots
+plots <- plot_grid(plotlist = q, ncol = 2)
+
+save_plot(filename = paste0(outdir, "/POLLINATORS_all_plots_pestH_SR.pdf"), plot = plots, base_height = 4, base_width = 8)
+
+
+
+################################################################################################################################
+
+#### Pollinators, Abundance model results ####
+
+# load the models
+load(paste0(datadir, "/ABMOD_output_POLLINATORS.rdata")) # abmod_PO
+
+#### land use - use intensity interactions ####
+
+pred_tab <- do.call("rbind", replicate(9, base_pred_tab, simplify = FALSE))
+
+# add a column for pest_H
+pred_tab$pest_H_log <- median(final.data.trans.pols$pest_H_log)
+
+pred_tab[4:6, 'Predominant_land_use'] <- "Secondary vegetation"
+pred_tab[7:9, 'Predominant_land_use'] <- "Cropland"
+
+pred_tab[c(2,5,8), 'Use_intensity'] <- "Light use"
+pred_tab[c(3,6,9), 'Use_intensity'] <- "Intense use"
+
+
+#### SR predictions ####
+
+
+# predict the result
+result <- PredictGLMERRandIter(model = abmod_PO$model, data = pred_tab)
+
+# transform the results
+result <- exp(result)-1
+
+result <- sweep(x = result, MARGIN = 2,STATS = result[1,],FUN = '/')
+
+result.median <- ((apply(X = result,MARGIN = 1,FUN = median))*100)-100
+result.upper <- ((apply(X = result,MARGIN = 1,FUN = quantile,probs = 0.975))*100)-100
+result.lower <- ((apply(X = result,MARGIN = 1,FUN = quantile,probs = 0.025))*100)-100
+
+
+pdf(file = paste0(outdir, "/POLLINATORS_all_plots_AB.pdf"))
+
+### plot ###
+# colours
+errbar.cols <- c(rep("#006400",3),rep("#8B0000", 3), rep("#EEAD0E", 3))
+
+
+errbar(x = 1:9,y = result.median,yplus = result.upper,yminus = result.lower,
+       col=errbar.cols,errbar.col = errbar.cols,
+       ylim=c(min(result.lower),150),xaxt="n",
+       pch =rep(c(16,17,18), 3), 
+       ylab="Abundance (%)",xlab="",bty="l")
+
+
+axis(side = 1,at = c(2,5,8),
+     labels = c("Primary \nvegetation","Secondary\nvegetation", "Cropland"),
+     padj = 0.5)
+
+abline(h=0,col="#00000077",lty=2)
+
+legend("topleft", 
+       legend = c("Minimal Use", "Light Use", "Intense Use"),
+       pch = c(16,17,18), bty = "n", inset=c(0,0))
+
+
+dev.off()
+
+
+
+
