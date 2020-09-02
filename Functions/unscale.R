@@ -10,7 +10,7 @@ unscale <- function(x, scale, centre, logval = FALSE){
     ((x*scale) + centre)
     
   }else{
-    ((log(x)*scale) + centre)
+    #((log(x)*scale) + centre) # this needs correcting
     
   }
   
