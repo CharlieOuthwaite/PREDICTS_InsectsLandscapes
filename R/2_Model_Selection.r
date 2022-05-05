@@ -5,31 +5,27 @@
 ##%######################################################%##
 
 # This script carries out the model selection process using the dataset generated
-# in the previous script. Models are run for 3 biodiversity metrics. 
+# in the previous script. Models are run for 2 biodiversity metrics. 
 
 rm(list = ls())
 
 
 # load libraries
 library(devtools)
-install_github(repo = "timnewbold/StatisticalModels")
+#install_github(repo = "timnewbold/StatisticalModels")
 library(StatisticalModels)
-library(roquefort)
 library(cowplot)
 library(gridGraphics)
 
 
 # directories
-datadir <- "1_PREDICTS_PLUS_VARIABLES"
-outdir <- "2_MODEL_SELECTION"
-dir.create(outdir)
+datadir <- "1_PREDICTS_PLUS_VARIABLES/"
+outdir <- "2_MODEL_SELECTION/"
+if(!dir.exists(outdir)) dir.create(outdir)
 
 # read in the PREDICTS datasets with landscape variables
 
 load(paste0(datadir, "/PREDICTS_dataset_TRANS_INSECTS.rdata")) # final.data.trans
-load(paste0(datadir, "/PREDICTS_dataset_TRANS_POLS.rdata")) # final.data.trans.pols 
-load(paste0(datadir, "/PREDICTS_dataset_TRANS_PC.rdata")) # final.data.trans.pc
-
 
 
 #### Run model selection process including landscape variables that are not correlated ####
@@ -44,8 +40,6 @@ load(paste0(datadir, "/PREDICTS_dataset_TRANS_PC.rdata")) # final.data.trans.pc
 
 #### 1. Species richness models ####
 
-
-
 ### A. ALL INSECTS ###
 
 # run the model selection process
@@ -53,19 +47,18 @@ load(paste0(datadir, "/PREDICTS_dataset_TRANS_PC.rdata")) # final.data.trans.pc
 system.time({sr1 <- GLMERSelect(modelData = final.data.trans, 
                                 responseVar = "Species_richness",
                                 fitFamily = "poisson", 
-                                fixedFactors = c("Predominant_land_use", "Forest_biome", "Use_intensity", "Tropical"),
-                                fixedTerms = list(pest_H_log = 1, landcovers.5k = 1, percNH = 1),
+                                fixedFactors = c("Predominant_land_use", "Use_intensity", "fields"),
+                                fixedTerms = list(pest_H_RS = 1, ncrop_RS = 1, percNH_RS = 1),
                                 randomStruct = "(1|SS)+(1|SSB)+(1|SSBS)", 
-                                fixedInteractions = c("Predominant_land_use:pest_H_log", 
-                                                      #"Predominant_land_use:ncrop",
-                                                      "Predominant_land_use:landcovers.5k", 
-                                                      "Predominant_land_use:percNH",
-                                                      "Use_intensity:pest_H_log", 
-                                                      #"Use_intensity:ncrop",
-                                                      "Use_intensity:landcovers.5k",
-                                                      "Use_intensity:percNH",
-                                                      "Predominant_land_use:Use_intensity",
-                                                      "Tropical:percNH"), verbose = F)}) 
+                                fixedInteractions = c("Predominant_land_use:pest_H_RS", 
+                                                      "Predominant_land_use:ncrop_RS",
+                                                      "Predominant_land_use:percNH_RS",
+                                                      "Predominant_land_use:fields",
+                                                      "Use_intensity:pest_H_RS", 
+                                                      "Use_intensity:ncrop_RS",
+                                                      "Use_intensity:percNH_RS",
+                                                      "Use_intensity:fields",
+                                                      "Predominant_land_use:Use_intensity"), verbose = F)}) 
 # save the output
 save(sr1, file = paste0(outdir, "/SPECIESRICHNESS_Model_selection_INSECTS.rdata"))
 
@@ -79,73 +72,16 @@ sr1stats <- as.data.frame(sr1$stats)
 write.csv(sr1stats, file = paste0(outdir, "/sr_stats_INSECTS.csv"), row.names = F)
 
 
+# Non selection version to assess all variables
 
-### B. POLLINATORS ###
+sr2 <- GLMER(modelData = final.data.trans,responseVar = "Species_richness",fitFamily = "poisson",
+             fixedStruct = "Predominant_land_use +  Use_intensity + fields + pest_H_RS + ncrop_RS + percNH_RS + Predominant_land_use:pest_H_RS + Predominant_land_use:ncrop_RS + Predominant_land_use:percNH_RS + Predominant_land_use:fields + Use_intensity:pest_H_RS + Use_intensity:ncrop_RS + Use_intensity:percNH_RS+ Use_intensity:fields + Predominant_land_use:Use_intensity",
+             randomStruct = "(1|SS)+(1|SSB)+(1|SSBS")
 
-system.time({sr2 <- GLMERSelect(modelData = final.data.trans.pols, 
-                                responseVar = "Species_richness",
-                                fitFamily = "poisson", 
-                                fixedFactors = c("Predominant_land_use", "Forest_biome", "Use_intensity", "Tropical"),
-                                fixedTerms = list(pest_H_log = 1, landcovers.5k = 1, percNH = 1),
-                                randomStruct = "(1|SS)+(1|SSB)+(1|SSBS)", 
-                                fixedInteractions = c("Predominant_land_use:pest_H_log", 
-                                                      #"Predominant_land_use:ncrop",
-                                                      "Predominant_land_use:landcovers.5k", 
-                                                      "Predominant_land_use:percNH",
-                                                      "Use_intensity:pest_H_log", 
-                                                      #"Use_intensity:ncrop",
-                                                      "Use_intensity:landcovers.5k",
-                                                      "Use_intensity:percNH",
-                                                      "Predominant_land_use:Use_intensity",
-                                                      "Tropical:percNH"), verbose = F)}) 
-# save the output
-save(sr2, file = paste0(outdir, "/SPECIESRICHNESS_Model_selection_POLLINATORS.rdata"))
-
-# take a look at the model output
 summary(sr2$model)
 
-# extract the stats produced as part of the model selection process
-sr2stats <- as.data.frame(sr2$stats)
-
-# save these
-write.csv(sr2stats, file = paste0(outdir, "/sr_stats_POLLINATORS.csv"), row.names = F)
-
-
-
-
-
-### C. PEST CONTROLLERS ###
-
-
-system.time({sr3 <- GLMERSelect(modelData = final.data.trans.pc, 
-                                responseVar = "Species_richness",
-                                fitFamily = "poisson", 
-                                fixedFactors = c("Predominant_land_use", "Forest_biome", "Use_intensity", "Tropical"),
-                                fixedTerms = list(pest_H_log = 1, landcovers.5k = 1, percNH = 1),
-                                randomStruct = "(1|SS)+(1|SSB)+(1|SSBS)", 
-                                fixedInteractions = c("Predominant_land_use:pest_H_log", 
-                                                      #"Predominant_land_use:ncrop",
-                                                      "Predominant_land_use:landcovers.5k", 
-                                                      "Predominant_land_use:percNH",
-                                                      "Use_intensity:pest_H_log", 
-                                                      #"Use_intensity:ncrop",
-                                                      "Use_intensity:landcovers.5k",
-                                                      "Use_intensity:percNH",
-                                                      "Predominant_land_use:Use_intensity",
-                                                      "Tropical:percNH"), verbose = F)}) 
-
-save(sr3, file = paste0(outdir, "/SPECIESRICHNESS_Model_selection_PESTC.rdata"))
-
-# take a look at the model output
-summary(sr3$model)
-
-# extract the stats produced as part of the model selection process
-sr3stats <- as.data.frame(sr3$stats)
-
-# save these
-write.csv(sr3stats, file = paste0(outdir, "/sr_stats_PESTC.csv"), row.names = F)
-
-
+# save the output
+save(sr2, file = paste0(outdir, "/RICHNESS_Model_Set_INSECTS.rdata"))
 
 
 ##%######################################################%##
@@ -154,33 +90,29 @@ write.csv(sr3stats, file = paste0(outdir, "/sr_stats_PESTC.csv"), row.names = F)
 #                                                          #
 ##%######################################################%##
 
+model_data <- final.data.trans[!is.na(final.data.trans$logAbun), ] # 4681 rows
 
-final.data.trans$logAbun <- log(final.data.trans$Total_abundance + 1)
-final.data.trans.pols$logAbun <- log(final.data.trans.pols$Total_abundance + 1)
-final.data.trans.pc$logAbun <- log(final.data.trans.pc$Total_abundance + 1)
+length(unique(model_data$SS)) # 229
+length(unique(model_data$SSBS)) # 4681
 
-
-
-### A. ALL INSECTS ###
+### A. ALL INSECTS ######SSBS A. ALL INSECTS ###
 
 
 system.time({ab1 <- GLMERSelect(modelData = final.data.trans, 
                                 responseVar = "logAbun",
                                 fitFamily = "gaussian", 
-                                fixedFactors = c("Predominant_land_use", "Forest_biome", "Use_intensity", "Tropical"),
-                                fixedTerms = list(pest_H_log = 1, landcovers.5k = 1, percNH = 1),
+                                fixedFactors = c("Predominant_land_use", "Use_intensity", "fields"),
+                                fixedTerms = list(pest_H_RS = 1, ncrop_RS = 1, percNH_RS = 1),
                                 randomStruct = "(1|SS)+(1|SSB)", 
-                                fixedInteractions = c("Predominant_land_use:pest_H_log", 
-                                                      #"Predominant_land_use:ncrop",
-                                                      "Predominant_land_use:landcovers.5k", 
-                                                      "Predominant_land_use:percNH",
-                                                      "Use_intensity:pest_H_log", 
-                                                      #"Use_intensity:ncrop",
-                                                      "Use_intensity:landcovers.5k",
-                                                      "Use_intensity:percNH",
-                                                      "Predominant_land_use:Use_intensity",
-                                                      "Tropical:percNH"), verbose = F)})
-
+                                fixedInteractions = c("Predominant_land_use:pest_H_RS", 
+                                                      "Predominant_land_use:ncrop_RS",
+                                                      "Predominant_land_use:percNH_RS",
+                                                      "Predominant_land_use:fields",
+                                                      "Use_intensity:pest_H_RS", 
+                                                      "Use_intensity:ncrop_RS",
+                                                      "Use_intensity:percNH_RS",
+                                                      "Use_intensity:fields",
+                                                      "Predominant_land_use:Use_intensity"), verbose = F)}) 
 # take a look at the model output
 summary(ab1$model)
 
@@ -194,73 +126,16 @@ ab1stats <- as.data.frame(ab1$stats)
 write.csv(ab1stats, file = paste0(outdir, "/ab_stats_INSECTS.csv"), row.names = F)
 
 
+# Non selection version to assess all variables
 
-### B. POLLINATORS ###
+ab2 <- GLMER(modelData = final.data.trans,responseVar = "logAbun",fitFamily = "gaussian",
+      fixedStruct = "Predominant_land_use +  Use_intensity + fields + pest_H_RS + ncrop_RS + percNH_RS + Predominant_land_use:pest_H_RS + Predominant_land_use:ncrop_RS + Predominant_land_use:percNH_RS + Predominant_land_use:fields + Use_intensity:pest_H_RS + Use_intensity:ncrop_RS + Use_intensity:percNH_RS+ Use_intensity:fields + Predominant_land_use:Use_intensity",
+      randomStruct = "(1|SS)+(1|SSB)")
 
-
-system.time({ab2 <- GLMERSelect(modelData = final.data.trans.pols, 
-                                responseVar = "logAbun",
-                                fitFamily = "gaussian", 
-                                fixedFactors = c("Predominant_land_use", "Forest_biome", "Use_intensity", "Tropical"),
-                                fixedTerms = list(pest_H_log = 1, landcovers.5k = 1, percNH = 1),
-                                randomStruct = "(1|SS)+(1|SSB)", 
-                                fixedInteractions = c("Predominant_land_use:pest_H_log", 
-                                                      #"Predominant_land_use:ncrop",
-                                                      "Predominant_land_use:landcovers.5k", 
-                                                      "Predominant_land_use:percNH",
-                                                      "Use_intensity:pest_H_log", 
-                                                      #"Use_intensity:ncrop",
-                                                      "Use_intensity:landcovers.5k",
-                                                      "Use_intensity:percNH",
-                                                      "Predominant_land_use:Use_intensity",
-                                                      "Tropical:percNH"), verbose = F)})
-
-# take a look at the model output
 summary(ab2$model)
 
 # save the output
-save(ab2, file = paste0(outdir, "/ABUNDANCE_Model_Selection_POLLINATORS.rdata"))
-
-# extract the stats produced as part of the model selection process
-ab2stats <- as.data.frame(ab2$stats)
-
-# save these
-write.csv(ab2stats, file = paste0(outdir, "/ab_stats_POLLINATORS.csv"), row.names = F)
-
-
-
-
-### C. PEST CONTROLLERS ###
-
-
-system.time({ab3 <- GLMERSelect(modelData = final.data.trans.pc, 
-                                responseVar = "logAbun",
-                                fitFamily = "gaussian", 
-                                fixedFactors = c("Predominant_land_use", "Forest_biome", "Use_intensity", "Tropical"),
-                                fixedTerms = list(pest_H_log = 1, landcovers.5k = 1, percNH = 1),
-                                randomStruct = "(1|SS)+(1|SSB)", 
-                                fixedInteractions = c("Predominant_land_use:pest_H_log", 
-                                                      #"Predominant_land_use:ncrop",
-                                                      "Predominant_land_use:landcovers.5k", 
-                                                      "Predominant_land_use:percNH",
-                                                      "Use_intensity:pest_H_log", 
-                                                      #"Use_intensity:ncrop",
-                                                      "Use_intensity:landcovers.5k",
-                                                      "Use_intensity:percNH",
-                                                      "Predominant_land_use:Use_intensity",
-                                                      "Tropical:percNH"), verbose = F)})
-
-# take a look at the model output
-summary(ab3$model)
-
-# save the output
-save(ab3, file = paste0(outdir, "/ABUNDANCE_Model_Selection_PESTC.rdata"))
-
-# extract the stats produced as part of the model selection process
-ab3stats <- as.data.frame(ab3$stats)
-
-# save these
-write.csv(ab3stats, file = paste0(outdir, "/ab_stats_PESTC.csv"), row.names = F)
+save(ab2, file = paste0(outdir, "/ABUNDANCE_Model_Set_INSECTS.rdata"))
 
 
 
