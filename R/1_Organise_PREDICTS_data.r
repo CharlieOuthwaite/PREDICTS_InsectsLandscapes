@@ -26,7 +26,7 @@ library(ggthemes)
 datadir <- "Data/"
 
 # where to save the final dataset
-outdir <- "/1_PREDICTS_PLUS_VARIABLES/"
+outdir <- "1_PREDICTS_PLUS_VARIABLES/"
 if(!dir.exists(outdir)) dir.create(outdir)
 
 # read in the complete PREDICTS dataset
@@ -346,6 +346,24 @@ pairs(final.data.trans[ , c(26:31)],
 dev.off()
 
 
+# edit field size names
+final.data.trans$fields <- as.character(final.data.trans$fields)
+final.data.trans$fields[final.data.trans$fields == "0"] <- "No fields"
+final.data.trans$fields[final.data.trans$fields == "3502"] <- "Very large"
+final.data.trans$fields[final.data.trans$fields == "3503"] <- "Large"
+final.data.trans$fields[final.data.trans$fields == "3504"] <- "Medium"
+final.data.trans$fields[final.data.trans$fields == "3505"] <- "Small"
+final.data.trans$fields[final.data.trans$fields == "3506"] <- "Very small"
+
+table(final.data.trans$fields)
+
+final.data.trans$fields <- factor(final.data.trans$fields, levels = c("No fields", "Very small", "Small", "Medium", "Large"))
+
+
+
+# transform abundance
+final.data.trans$logAbun <- log(final.data.trans$Total_abundance + 1)
+
 
 # save transformed dataset
 save(final.data.trans, file = paste0(outdir, "/PREDICTS_dataset_TRANS_INSECTS.rdata"))
@@ -361,23 +379,16 @@ save(final.data.trans, file = paste0(outdir, "/PREDICTS_dataset_TRANS_INSECTS.rd
 
 # get the number of studies, sites, etc for the paper
 
-length(unique(final.data.trans$SS)) # 209 studies
-nrow(final.data.trans) # 3621 sites
-
-length(unique(final.data.trans.pols$SS)) # 142 studies
-nrow(final.data.trans.pols) # 2902 sites
-
-length(unique(final.data.pc$SS)) # 99 studies
-nrow(final.data.pc) # 1454 sites
+length(unique(final.data.trans$SS)) # 248 studies
+nrow(final.data.trans) # 4987 sites
 
 
 
 ##%######################################################%##
 #                                                          #
-####   Plot of site distribution across forest biomes   ####
+####            Plot points on a global map             ####
 #                                                          #
 ##%######################################################%##
-
 
 
 # extract the PREDICTS points
@@ -401,43 +412,32 @@ nsites$nsites <- as.numeric(as.character(nsites$nsites))
 nsites$lon <- as.numeric(as.character(nsites$lon))
 nsites$lat <- as.numeric(as.character(nsites$lat))
 
-# select the forest biomes only
-ecobio <- ecobio[ecobio$BIOME %in% c(1:6, 12), 'BIOME']
-
-ecobio$BIOME <- sub(12, "Mediterranean Forests, Woodlands & Scrub", ecobio$BIOME)
-ecobio$BIOME <- sub(1, "Tropical & Subtropical Moist Broadleaf Forests", ecobio$BIOME)
-ecobio$BIOME <- sub(2, "Tropical & Subtropical Dry Broadleaf Forests", ecobio$BIOME)
-ecobio$BIOME <- sub(3, "Tropical & Subtropical Coniferous Forests", ecobio$BIOME)
-ecobio$BIOME <- sub(4, "Temperate Broadleaf & Mixed Forests", ecobio$BIOME)
-ecobio$BIOME <- sub(5, "Temperate Conifer Forests", ecobio$BIOME)
-ecobio$BIOME <- sub(6, "Boreal Forests/Taiga", ecobio$BIOME)
-
 
 # plot the raster in ggplot
 map.world <- map_data('world')
 
-# for colourblind pallette work around
-n = length(unique(ecobio$BIOME))
+
 
 # plot of predicts sites across biomes including size per n sites
 ggplot()+
   geom_map(data=map.world, map=map.world,
            aes(x=long, y=lat, group=group, map_id=region),
            fill= c("#7CCD7C"), colour= "transparent", size=0.2, alpha = 0.5) +
-  geom_sf(data = ecobio,  aes(fill = BIOME), alpha = 1, col = NA) +
+  #geom_sf(data = ecobio,  aes(fill = BIOME), alpha = 1, col = NA) +
   geom_point(data = nsites, aes(x = lon, y = lat, size = nsites), col = c("#0F0F0F"), alpha = 0.5) +
   #geom_polygon(data = wwfbiomes, x = )
   theme(panel.grid.major = element_line(colour = "transparent"), 
         panel.background = element_blank(),
-        legend.position = "bottom",
+        legend.position = "right",
         legend.title = element_blank(),
         legend.key = element_blank(),
-        text = element_text(size = 16)) +
+        text = element_text(size = 16), 
+        axis.ticks = element_blank(), 
+        axis.text = element_blank()) +
   xlab("") +
   ylab("") +
   scale_size_continuous(range = c(0.2, 5), breaks = c(1, 10, 50, 100, 200)) +
-  guides(fill=guide_legend(nrow=7,byrow=TRUE), size = guide_legend(nrow = 7, byrow = T)) +
-  scale_fill_manual(breaks = ecobio$BIOME, values = colorblind_pal()(n + 1)[-1])
+  guides(fill=guide_legend(nrow=7,byrow=TRUE), size = guide_legend(nrow = 7, byrow = T)) 
 
 
 ggsave(filename = paste0(outdir, "/MAP_Predicts_points_biome_INSECTS.pdf"),
