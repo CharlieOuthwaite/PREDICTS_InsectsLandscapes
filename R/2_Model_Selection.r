@@ -113,7 +113,7 @@ load(paste0(datadir, "/PREDICTS_dataset_TRANS_ORDERS.rdata")) # 10562 rows
 ##%######################################################%##
 
 
-model_struc <- "Predominant_land_use + Use_intensity + fields + pest_H_RS + ncrop_RS + percNH_RS +Predominant_land_use:Order2 + Use_intensity:Order2 + fields:Order2 + pest_H_RS:Order2 + ncrop_RS:Order2 + percNH_RS:Order2 + Predominant_land_use:pest_H_RS:Order2 + Predominant_land_use:ncrop_RS:Order2 + Predominant_land_use:percNH_RS:Order2 + Predominant_land_use:fields:Order2 + Use_intensity:pest_H_RS:Order2 + Use_intensity:ncrop_RS:Order2 + Use_intensity:percNH_RS:Order2 + Use_intensity:fields:Order2 + Predominant_land_use:Use_intensity:Order2"
+model_struc <- "Predominant_land_use + Use_intensity + fields + Order2 + pest_H_RS + ncrop_RS + percNH_RS +Predominant_land_use:Order2 + Use_intensity:Order2 + fields:Order2 + pest_H_RS:Order2 + ncrop_RS:Order2 + percNH_RS:Order2 + Predominant_land_use:pest_H_RS:Order2 + Predominant_land_use:ncrop_RS:Order2 + Predominant_land_use:percNH_RS:Order2 + Predominant_land_use:fields:Order2 + Use_intensity:pest_H_RS:Order2 + Use_intensity:ncrop_RS:Order2 + Use_intensity:percNH_RS:Order2 + Use_intensity:fields:Order2 + Predominant_land_use:Use_intensity:Order2"
 
 sr1.or <- GLMER(modelData = final.data.trans,
              responseVar = "Species_richness",
@@ -125,6 +125,10 @@ sr1.or <- GLMER(modelData = final.data.trans,
              #maxIters = 50000
              )
 
+# Error
+# fixed-effect model matrix is rank deficient so dropping 183 columns / coefficients
+# Error in pwrssUpdate(pp, resp, tol = tolPwrss, GQmat = GHrule(0L), compDev = compDev,  : 
+#                        Downdated VtV is not positive definite
 
 summary(sr1.or$model)
 
@@ -151,16 +155,17 @@ length(unique(model_data$SS)) # 229
 length(unique(model_data$SSBS)) # 4681
 
 
-
-model_struc <-"Predominant_land_use +  Use_intensity + fields + pest_H_RS + ncrop_RS + percNH_RS + Predominant_land_use:pest_H_RS + Predominant_land_use:ncrop_RS + Predominant_land_use:percNH_RS + Predominant_land_use:fields + Use_intensity:pest_H_RS + Use_intensity:ncrop_RS + Use_intensity:percNH_RS + Use_intensity:fields + Predominant_land_use:Use_intensity"
+model_struc <- "Predominant_land_use + Use_intensity + fields + Order2 + pest_H_RS + ncrop_RS + percNH_RS +Predominant_land_use:Order2 + Use_intensity:Order2 + fields:Order2 + pest_H_RS:Order2 + ncrop_RS:Order2 + percNH_RS:Order2 + Predominant_land_use:pest_H_RS:Order2 + Predominant_land_use:ncrop_RS:Order2 + Predominant_land_use:percNH_RS:Order2 + Predominant_land_use:fields:Order2 + Use_intensity:pest_H_RS:Order2 + Use_intensity:ncrop_RS:Order2 + Use_intensity:percNH_RS:Order2 + Use_intensity:fields:Order2 + Predominant_land_use:Use_intensity:Order2"
 
 # Non selection version to assess all variables
 
-ab1 <- GLMER(modelData = model_data,responseVar = "logAbun",fitFamily = "gaussian",
+ab1.or <- GLMER(modelData = model_data,responseVar = "logAbun",fitFamily = "gaussian",
              fixedStruct = model_struc,
              randomStruct = "(1|SS)+(1|SSB)")
 
-summary(ab1$model)
+# fixed-effect model matrix is rank deficient so dropping 235 columns / coefficients
+
+summary(ab1.or$model)
 
 # save the output
 save(ab1, file = paste0(outdir, "/ABUNDANCE_Model_Set_INSECTS.rdata"))
