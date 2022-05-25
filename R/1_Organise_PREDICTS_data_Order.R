@@ -312,7 +312,7 @@ sites.sub <- droplevels(sites.sub)
 
 # save the untransformed datasets including all variables
 save(sites.sub, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_ORDERS.rdata"))
-
+#load(file = paste0(outdir, "/PREDICTS_dataset_inc_variables_ORDERS.rdata"))
 
 
 ##%######################################################%##
@@ -391,12 +391,21 @@ final.data.trans[final.data.trans$Predominant_land_use == "Secondary vegetation 
 table(final.data.trans$Predominant_land_use)
 
 
+# combine plantation and cropland sites
+final.data.trans$LU <- final.data.trans$Predominant_land_use
+
+# set cropland and plantation to "Agriculture"
+final.data.trans$LU[final.data.trans$LU %in% c("Cropland", "Plantation")] <- "Agriculture"
+
 # set factor levels of predominant land use
-final.data.trans$Predominant_land_use <- factor(final.data.trans$Predominant_land_use,
-                                                levels=c("Primary vegetation","Secondary vegetation", "Plantation forest", "Cropland"))
+final.data.trans$LU <- factor(final.data.trans$LU,
+                              levels=c("Primary vegetation","Secondary vegetation", "Agriculture"))
 
 # nsites per land use
-table(final.data.trans$Predominant_land_use)
+table(final.data.trans$LU)
+
+# Primary vegetation Secondary vegetation          Agriculture 
+#               3266                 3676                 2711
 
 
 # pdf(file = paste0(outdir, "/Correlations_final_variables.pdf"), width =9, height = 9)
@@ -451,4 +460,23 @@ save(final.data.trans, file = paste0(outdir, "/PREDICTS_dataset_TRANS_ORDERS.rda
 length(unique(final.data.trans$SS)) # 248 studies
 length(unique(final.data.trans$SSBS)) # 4987 sites
 
+table(final.data.trans$Order2, final.data.trans$LU)
 
+
+# 
+#               Primary vegetation Secondary vegetation Agriculture
+# Archaeognatha                109                  120           0
+# Coleoptera                   898                  502         275
+# Dermaptera                   110                   80          57
+# Dictyoptera                  124                  133          52
+# Diptera                       95                  250         204
+# Freshwater                   135                  152          69
+# Hemiptera                    160                  211         117
+# Hymenoptera                  564                  741        1411
+# Isoptera                      45                  106          53
+# Lepidoptera                  424                  685         183
+# Neuroptera                   141                  145          67
+# Orthopterida                 129                  168         120
+# Other                         43                   89          33
+# Psocodea                     144                  147           2
+# Thysanoptera                 145                  147          68

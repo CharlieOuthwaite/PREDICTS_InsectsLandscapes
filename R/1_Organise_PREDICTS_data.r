@@ -248,7 +248,7 @@ dev.off()
 
 # save the untransformed datasets including all variables
 save(sites.sub, file = paste0(outdir, "/PREDICTS_dataset_inc_variables_INSECTS.rdata"))
-
+#load(file = paste0(outdir, "/PREDICTS_dataset_inc_variables_INSECTS.rdata"))
 
 
 ##%######################################################%##
@@ -326,14 +326,21 @@ final.data.trans[final.data.trans$Predominant_land_use == "Secondary vegetation 
 
 table(final.data.trans$Predominant_land_use)
 
+# combine plantation and cropland sites
+final.data.trans$LU <- final.data.trans$Predominant_land_use
+
+# set cropland and plantation to "Agriculture"
+final.data.trans$LU[final.data.trans$LU %in% c("Cropland", "Plantation")] <- "Agriculture"
 
 # set factor levels of predominant land use
-final.data.trans$Predominant_land_use <- factor(final.data.trans$Predominant_land_use,
-                                                levels=c("Primary vegetation","Secondary vegetation", "Plantation forest", "Cropland"))
+final.data.trans$LU <- factor(final.data.trans$LU,
+                                                levels=c("Primary vegetation","Secondary vegetation", "Agriculture"))
 
 # nsites per land use
-table(final.data.trans$Predominant_land_use)
+table(final.data.trans$LU)
 
+# Primary vegetation Secondary vegetation          Agriculture 
+#               1564                 1480                 1492 
 
 pdf(file = paste0(outdir, "/Correlations_final_variables.pdf"), width =9, height = 9)
 # correlations of final set of variables - transformed
