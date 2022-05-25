@@ -15,7 +15,7 @@
 
 # file names:
 # APR = application rate
-# QI = qality index
+# QI = quality index
 # HarvestedArea = slightly different to Monfreda versions. 
 
 # Resolution = 5 arc-minute (10km at the equator)
@@ -53,6 +53,10 @@ plot(test_map2)
 summary(test_map2)
 unique(test_map2)
 
+# trying to figure out how the classifications on the maps in the paper are coded:
+# "For this reason, we aggregated banned and not approved (and therefore not used) 
+# substances into one class called and shown in our PEST-CHEMGRIDS release as B/NA."
+
 
 test_map3 <- test_map
 test_map3[test_map3 == -1] <- "B_NA"
@@ -77,9 +81,6 @@ files_L <- files[grep(files, pattern = "5_L")] # 200 files
 
 # stack the raster files and summarise the information
 pest_H <- stack(paste0(datadir, "/", files_H))
-
-# first convert all negative values to NA
-#pest_H[pest_H < 0] <- NA
 
 
 # try the reclassify function
