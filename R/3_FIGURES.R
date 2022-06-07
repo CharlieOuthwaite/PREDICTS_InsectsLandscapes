@@ -35,6 +35,7 @@ source('functions/unscale.r')
 
 # load the models
 load(paste0(datadir, "/RICHNESS_Model_Set_INSECTS.rdata")) # sr1
+load(paste0(datadir, "/ABUNDANCE_Model_Set_INSECTS.rdata")) # sr1
 
 # load the dataset
 load(paste0(datadir2, "/PREDICTS_dataset_TRANS_INSECTS.rdata")) # final.data.trans
@@ -53,7 +54,7 @@ range(final.data.trans$ncrop) # 0.0000 123
 range(final.data.trans$pest_L) # 0.0000 139.7747
 range(final.data.trans$pest_H) # 0.0000 166.4538
 range(final.data.trans$percNH) # 0.992 99.988
-table(final.data.trans$fields) # no very large fields
+table(final.data.trans$fields) # no fields to large fields (no very large fields)
 
 # No fields Very small      Small     Medium      Large 
 #      2645        298        663       1085        296 
@@ -66,6 +67,7 @@ pest_H <- raster("Data/Pesticide_totalAPR_High.tif")
 pest_L <- raster("Data/Pesticide_totalAPR_Low.tif")
 fields <- raster("Data/Global Field Sizes/dominant_field_size_categories.tif")
 
+# take a look at range of values
 ncrops # 1 127
 percNH # 0 100
 pest_H # 0, 328.0646

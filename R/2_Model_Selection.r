@@ -109,8 +109,8 @@ load(paste0(datadir, "/PREDICTS_dataset_TRANS_ORDERS.rdata")) # 10562 rows
 
 model_struc <- "LU + Use_intensity + fields + Order2 + pest_H_RS + ncrop_RS + percNH_RS +LU:Order2 + Use_intensity:Order2 + fields:Order2 + pest_H_RS:Order2 + ncrop_RS:Order2 + percNH_RS:Order2 + LU:pest_H_RS:Order2 + LU:ncrop_RS:Order2 + LU:percNH_RS:Order2 + LU:fields:Order2 + Use_intensity:pest_H_RS:Order2 + Use_intensity:ncrop_RS:Order2 + Use_intensity:percNH_RS:Order2 + Use_intensity:fields:Order2 + LU:Use_intensity:Order2"
 
-# including fewer interactions
-model_struc2 <- "LU + Use_intensity + fields + Order2 + pest_H_RS + ncrop_RS + percNH_RS +LU:Order2 + Use_intensity:Order2 + fields:Order2 + pest_H_RS:Order2 + ncrop_RS:Order2 + percNH_RS:Order2 + LU:pest_H_RS:Order2 + LU:ncrop_RS:Order2 + LU:percNH_RS:Order2 + LU:fields:Order2 + Use_intensity:pest_H_RS:Order2 + Use_intensity:ncrop_RS:Order2 + Use_intensity:percNH_RS:Order2 + Use_intensity:fields:Order2 + LU:Use_intensity:Order2"
+# including fewer interactions?
+#model_struc2 <- "LU + Use_intensity + fields + Order2 + pest_H_RS + ncrop_RS + percNH_RS +LU:Order2 + Use_intensity:Order2 + fields:Order2 + pest_H_RS:Order2 + ncrop_RS:Order2 + percNH_RS:Order2 + LU:pest_H_RS:Order2 + LU:ncrop_RS:Order2 + LU:percNH_RS:Order2 + LU:fields:Order2 + Use_intensity:pest_H_RS:Order2 + Use_intensity:ncrop_RS:Order2 + Use_intensity:percNH_RS:Order2 + Use_intensity:fields:Order2 + LU:Use_intensity:Order2"
 
 sr1.or <- GLMER(modelData = final.data.trans,
              responseVar = "Species_richness",
@@ -121,10 +121,8 @@ sr1.or <- GLMER(modelData = final.data.trans,
              #optimizer = "Nelder_Mead", 
              maxIters = 50000
              )
-
-# Warning message:
-#   In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
-#                  Model failed to converge with max|grad| = 0.00818785 (tol = 0.002, component 1)
+# all interactions: 
+# fixed-effect model matrix is rank deficient so dropping 190 columns / coefficients
 
 summary(sr1.or$model)
 
