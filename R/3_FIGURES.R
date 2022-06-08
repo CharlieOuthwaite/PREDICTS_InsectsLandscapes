@@ -25,6 +25,18 @@ source('functions/rescale.r')
 source('functions/unscale.r')
 
 
+#### create custom theme to be applied to all plots ####
+
+theme_custom <- theme(panel.grid = element_blank(),
+                      legend.position = c(0.8,0.8), 
+                      legend.title = element_blank(),
+                      legend.text = element_text(size = 8),
+                      aspect.ratio = 1, legend.background = element_blank(),
+                      #text = element_text(size = 8), 
+                      axis.text = element_text(size = 8), 
+                      line = element_line(size = 0.2), 
+                      panel.border = element_rect(size = 0.2),
+                      axis.title = element_text(size = 8))
 
 ##%######################################################%##
 #                                                          #
@@ -75,12 +87,155 @@ pest_L # 0, 231.9041
 fields # very small, small, medium, large, very large
 
 
+##%######################################################%##
+#                                                          #
+####               LU and UI interaction                ####
+#                                                          #
+##%######################################################%##
+
+
+pred_tab <- data.frame(ncrop_RS = median(final.data.trans$ncrop_RS),
+                       pest_H_RS = median(final.data.trans$pest_H_RS),
+                       fields = "Medium",
+                       percNH_RS = median(final.data.trans$percNH_RS),
+                       Use_intensity = "Minimal use",
+                       LU = "Primary vegetation",
+                       Species_richness = 0,
+                       logAbun = 0)
+
+pred_tab$LU <- factor(pred_tab$LU, levels = levels(ab1$data$LU))
+pred_tab$Use_intensity <- factor(pred_tab$Use_intensity, levels = levels(ab1$data$Use_intensity))
+pred_tab$fields <- factor(pred_tab$fields, levels = levels(ab1$data$fields))
+
+
+# add and change factor levels of land use and intensity
+
+pred_tab <- do.call("rbind", replicate(9, pred_tab, simplify = FALSE))
+
+
+pred_tab[4:6, 'LU'] <- "Secondary vegetation"
+pred_tab[7:9, 'LU'] <- "Agriculture"
+
+pred_tab[c(2,5,8), 'Use_intensity'] <- "Light use"
+pred_tab[c(3,6,9), 'Use_intensity'] <- "Intense use"
+
+
+# predict the result
+resulta <- PredictGLMERRandIter(model = ab1$model, data = pred_tab)
+
+# transform the results
+resulta <- exp(resulta)-1
+
+resulta <- sweep(x = resulta, MARGIN = 2, STATS = resulta[1,], FUN = '/')
+
+pred_tab$median <- ((apply(X = resulta, MARGIN = 1, FUN = median))*100)-100
+pred_tab$upper <- ((apply(X = resulta, MARGIN = 1, FUN = quantile,probs = 0.975))*100)-100
+pred_tab$lower <- ((apply(X = resulta, MARGIN = 1, FUN = quantile,probs = 0.025))*100)-100
+
+plot_data <- pred_tab
+
+plot_data[plot_data$upper == 0, c("upper", "lower")] <- NA
+
+plot_data$LU <- sub("Primary vegetation", "Primary\nvegetation", plot_data$LU)
+plot_data$LU <- sub("Secondary vegetation", "Secondary\nvegetation", plot_data$LU)
+
+plot_data$LU <- factor(plot_data$LU, levels = c("Primary\nvegetation", "Secondary\nvegetation", "Agriculture"))
+
+p1 <- ggplot(data = plot_data)+
+  geom_point(aes(x = LU, y = median, col = LU, shape = Use_intensity),
+             position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = LU, col = LU),
+                position = position_dodge2(padding = 0.5)) +
+  scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
+  xlab("") +
+  ylab("Total Abundance (%)") +
+  theme_bw() +
+  theme_custom + 
+  theme(legend.position = c(0.8, 0.8), strip.background = element_rect(fill = NA, size = 0.2))
+
+
+
+# predict the result
+results <- PredictGLMERRandIter(model = sr1$model, data = pred_tab)
+
+# transform the results
+results <- exp(results)
+
+results <- sweep(x = results, MARGIN = 2, STATS = results[1,], FUN = '/')
+
+pred_tab$median <- ((apply(X = results, MARGIN = 1, FUN = median))*100)-100
+pred_tab$upper <- ((apply(X = results, MARGIN = 1, FUN = quantile,probs = 0.975))*100)-100
+pred_tab$lower <- ((apply(X = results, MARGIN = 1, FUN = quantile,probs = 0.025))*100)-100
+
+plot_data <- pred_tab
+
+plot_data[plot_data$upper == 0, c("upper", "lower")] <- NA
+
+plot_data$LU <- sub("Primary vegetation", "Primary\nvegetation", plot_data$LU)
+plot_data$LU <- sub("Secondary vegetation", "Secondary\nvegetation", plot_data$LU)
+
+plot_data$LU <- factor(plot_data$LU, levels = c("Primary\nvegetation", "Secondary\nvegetation", "Agriculture"))
+
+p2 <- ggplot(data = plot_data)+
+  geom_point(aes(x = LU, y = median, col = LU, shape = Use_intensity),
+             position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = LU, col = LU),
+                position = position_dodge2(padding = 0.5)) +
+  scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
+  xlab("") +
+  ylab("Species Richness (%)") +
+  theme_bw() +
+  theme_custom + 
+  theme(legend.position = "none", strip.background = element_rect(fill = NA, size = 0.2))
+
+
+cowplot::plot_grid(p1, p2, nrow = 2, labels = c("(a)", "(b)"), label_size = 10)
+
+ggsave(filename = paste0(outdir, "/All_insects_LUUI.pdf"), width = 4, height = 6, uni = "in")
 
 
 
 
 
 
+
+##%######################################################%##
+#                                                          #
+####          Question 1 - intensity variables          ####
+#                                                          #
+##%######################################################%##
+
+#### ALL INSECTS ####
+
+
+pred_tab <- data.frame(ncrop_RS = median(final.data.trans$ncrop_RS),
+                       pest_H_RS = median(final.data.trans$pest_H_RS),
+                       fields = "Medium",
+                       percNH_RS = median(final.data.trans$percNH_RS),
+                       Use_intensity = "Intense use",
+                       LU = "Agriculture",
+                       Species_richness = 0,
+                       logAbun = 0)
+
+# add factor levels
+pred_tab$LU <- factor(pred_tab$LU, levels = levels(ab1$data$LU))
+pred_tab$Use_intensity <- factor(pred_tab$Use_intensity, levels = levels(ab1$data$Use_intensity))
+pred_tab$fields <- factor(pred_tab$fields, levels = levels(ab1$data$fields))
+
+
+# replicate the row for number of predictions required
+pred_tab <- do.call("rbind", replicate(14, pred_tab, simplify = FALSE))
+
+
+# range of ncrop, 0.0000 123
+
+
+
+# range of pest_H, 0.0000 166.4538
+
+# range of field size, very small - large (ignore no fields?)
 
 
 
