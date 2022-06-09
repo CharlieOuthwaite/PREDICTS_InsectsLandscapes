@@ -40,7 +40,7 @@ theme_custom <- theme(panel.grid = element_blank(),
 
 ##%######################################################%##
 #                                                          #
-####                1. All insect plots                 ####
+####                ALL INSECT PLOTS                 ####
 #                                                          #
 ##%######################################################%##
 
@@ -58,7 +58,7 @@ scalers_ins <- read.csv(paste0(datadir2, "/Scaling_values_INSECTS.csv"))
 
 ##%######################################################%##
 #                                                          #
-####     1. Compare global and predicts data ranges     ####
+####       Compare global and predicts data ranges      ####
 #                                                          #
 ##%######################################################%##
 
@@ -87,11 +87,12 @@ pest_L # 0, 231.9041
 fields # very small, small, medium, large, very large
 
 
-##%######################################################%##
-#                                                          #
-####               LU and UI interaction                ####
-#                                                          #
-##%######################################################%##
+##%########################################################%##
+#                                                            #
+####               *LU and UI interaction*                ####
+#                                                            #
+##%########################################################%##
+
 
 
 pred_tab <- data.frame(ncrop_RS = median(final.data.trans$ncrop_RS),
@@ -207,7 +208,7 @@ ggsave(filename = paste0(outdir, "/All_insects_LUUI.pdf"), width = 4, height = 6
 #                                                          #
 ##%######################################################%##
 
-#### ALL INSECTS ####
+
 
 
 pred_tab <- data.frame(ncrop_RS = median(final.data.trans$ncrop_RS),
@@ -241,6 +242,189 @@ pred_tab <- do.call("rbind", replicate(14, pred_tab, simplify = FALSE))
 
 
 
+
+
+##%######################################################%##
+#                                                          #
+####                  BY ORDER PLOTS                    ####
+#                                                          #
+##%######################################################%##
+
+
+# load the models
+load(paste0(datadir, "/RICHNESS_Model_Set_ORDERS.rdata")) # sr1
+load(paste0(datadir, "/ABUNDANCE_Model_Set_ORDERS.rdata")) # sr1
+
+# load the dataset
+load(paste0(datadir2, "/PREDICTS_dataset_TRANS_ORDERS.rdata")) # final.data.trans
+
+# load the scalers
+scalers_ins <- read.csv(paste0(datadir2, "/Scaling_values_ORDERS.csv"))
+
+
+##%########################################################%##
+#                                                            #
+####               *LU and UI interaction*                ####
+#                                                            #
+##%########################################################%##
+
+
+pred_tab <- data.frame(ncrop_RS = median(final.data.trans$ncrop_RS),
+                       pest_H_RS = median(final.data.trans$pest_H_RS),
+                       fields = "Medium",
+                       percNH_RS = median(final.data.trans$percNH_RS),
+                       Use_intensity = "Minimal use",
+                       LU = "Primary vegetation",
+                       Order2 = levels(final.data.trans$Order2)[1],
+                       Species_richness = 0,
+                       logAbun = 0)
+
+pred_tab$LU <- factor(pred_tab$LU, levels = levels(ab1.or$data$LU))
+pred_tab$Use_intensity <- factor(pred_tab$Use_intensity, levels = levels(ab1.or$data$Use_intensity))
+pred_tab$fields <- factor(pred_tab$fields, levels = levels(ab1.or$data$fields))
+pred_tab$Order2 <- factor(pred_tab$Order2, levels = levels(ab1.or$data$Order2))
+
+
+# add and change factor levels of land use and intensity
+
+# create initial table
+pred_tab <- do.call("rbind", replicate(3, pred_tab, simplify = FALSE))
+
+pred_tab[2, 'LU'] <- "Secondary vegetation"
+pred_tab[3, 'LU'] <- "Agriculture"
+
+# pred_tab[c(2,5,8), 'Use_intensity'] <- "Light use"
+# pred_tab[c(3,6,9), 'Use_intensity'] <- "Intense use"
+
+# replicate and add orders
+pred_tab <- do.call("rbind", replicate(15, pred_tab, simplify = FALSE))
+
+pred_tab$Order2 <- rep(levels(pred_tab$Order2), each = 3)
+
+# predict the result
+resulta <- PredictGLMERRandIter(model = ab1.or$model, data = pred_tab)
+
+# transform the results
+resulta <- exp(resulta)-1
+
+library(dplyr)
+resulta <- as.data.frame(resulta)
+resulta$Order2 <- pred_tab$Order2
+resultsa <- resulta %>% group_split(Order2)
+
+# remove order column
+resultsa <- lapply(resultsa, function(x) x[!(names(x) %in% c("Order2"))])
+
+# sweep so each order is relative to the primary veg value
+resultsa <- lapply(resultsa, function(x){ r <- as.matrix(x)
+  sweep(x = as.matrix(r), MARGIN = 2, STATS = r[1,], FUN = '/')
+} )
+
+
+#resulta <- sweep(x = resulta, MARGIN = 2, STATS = resulta[1,], FUN = '/')
+
+# recombine data
+result_all <- as.data.frame(do.call("rbind", resultsa))
+
+pred_tab$median <- ((apply(X = result_all, MARGIN = 1, FUN = median))*100)-100
+pred_tab$upper <- ((apply(X = result_all, MARGIN = 1, FUN = quantile,probs = 0.975))*100)-100
+pred_tab$lower <- ((apply(X = result_all, MARGIN = 1, FUN = quantile,probs = 0.025))*100)-100
+
+
+# organise the data for plotting
+plot_data <- pred_tab
+
+# set to NA for primary vegetation as want this as a point only
+plot_data[plot_data$upper == 0, c("upper", "lower")] <- NA
+
+# edit for labelling
+plot_data$LU <- sub("Primary vegetation", "Primary\nvegetation", plot_data$LU)
+plot_data$LU <- sub("Secondary vegetation", "Secondary\nvegetation", plot_data$LU)
+
+plot_data$LU <- factor(plot_data$LU, levels = c("Primary\nvegetation", "Secondary\nvegetation", "Agriculture"))
+
+p1 <- ggplot(data = plot_data)+
+  geom_point(aes(x = LU, y = median, col = LU),
+             position = position_dodge(width = 0.9), size = 1) +
+  geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = LU, col = LU),
+                position = position_dodge2(padding = 0.5), width = 0.2, size = 0.5) +
+  facet_wrap(~Order2, nrow = 4) +
+  scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
+  xlab("") +
+  ylab("Total Abundance (%)") +
+  ylim(-200, 1000) + 
+  theme_bw() +
+  theme_custom + 
+  theme(legend.position = c(0.8, 0.8), strip.background = element_rect(fill = NA, size = 0.2),
+        axis.text.x = element_text(angle = 50, hjust = 1, size = 8))
+
+
+ggsave(p1, filename = paste0(outdir, "/ORDER_Abundance_LUUI.pdf"), width = 6, height = 7, uni = "in")
+
+
+# alternative figure option
+
+p2 <- ggplot(data = plot_data)+
+  geom_point(aes(x = Order2, y = median, col = LU),
+             position = position_dodge(width = 0.9), size = 1) +
+  geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = Order2, col = LU),
+                position = position_dodge2(padding = 0.5)) +
+  #facet_wrap(~Order2, nrow = 4) +
+  scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
+  xlab("") +
+  ylab("Total Abundance (%)") +
+  ylim(-2500, 2500) + 
+  theme_bw() +
+  theme_custom + 
+  theme(legend.position = c(0.8, 0.8), strip.background = element_rect(fill = NA, size = 0.2),
+        axis.text.x = element_text(angle = 50, hjust = 1, size = 8))
+
+
+ggsave(p2, filename = paste0(outdir, "/ORDER_Abundance_LUUI_alternative.pdf"), width = 4, height = 3, uni = "in")
+
+
+
+
+# predict the result
+results <- PredictGLMERRandIter(model = sr1$model, data = pred_tab)
+
+# transform the results
+results <- exp(results)
+
+results <- sweep(x = results, MARGIN = 2, STATS = results[1,], FUN = '/')
+
+pred_tab$median <- ((apply(X = results, MARGIN = 1, FUN = median))*100)-100
+pred_tab$upper <- ((apply(X = results, MARGIN = 1, FUN = quantile,probs = 0.975))*100)-100
+pred_tab$lower <- ((apply(X = results, MARGIN = 1, FUN = quantile,probs = 0.025))*100)-100
+
+plot_data <- pred_tab
+
+plot_data[plot_data$upper == 0, c("upper", "lower")] <- NA
+
+plot_data$LU <- sub("Primary vegetation", "Primary\nvegetation", plot_data$LU)
+plot_data$LU <- sub("Secondary vegetation", "Secondary\nvegetation", plot_data$LU)
+
+plot_data$LU <- factor(plot_data$LU, levels = c("Primary\nvegetation", "Secondary\nvegetation", "Agriculture"))
+
+p2 <- ggplot(data = plot_data)+
+  geom_point(aes(x = LU, y = median, col = LU, shape = Use_intensity),
+             position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = LU, col = LU),
+                position = position_dodge2(padding = 0.5)) +
+  scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
+  xlab("") +
+  ylab("Species Richness (%)") +
+  theme_bw() +
+  theme_custom + 
+  theme(legend.position = "none", strip.background = element_rect(fill = NA, size = 0.2))
+
+
+cowplot::plot_grid(p1, p2, nrow = 2, labels = c("(a)", "(b)"), label_size = 10)
+
+ggsave(filename = paste0(outdir, "/All_insects_LUUI.pdf"), width = 4, height = 6, uni = "in")
 
 
 
