@@ -13,6 +13,7 @@ library(StatisticalModels)
 library(ggplot2)
 library(cowplot)
 library(raster)
+library(dplyr)
 
 # set directories
 datadir <- "2_MODEL_SELECTION"
@@ -274,7 +275,7 @@ dif_tab <-  NULL
 
 
 # fill in differences
-for(i in c(1:3, 7:9, 13:15, 19:21)){
+for(i in c(1:3, 7:9, 13:15, 19:21, 25:27, 31:33, 37:39, 43:45)){
   
 
     # determine the percentage change across all iters
@@ -307,14 +308,14 @@ dif_tab2$upper <- as.numeric(dif_tab2$upper)
 tests <- rep(c("ncrop", 
            "pest_H",
            "Fields", 
-           "percNH"),each = 3)
+           "percNH"),each = 3, 2)
 
-LU <- rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 4)
+LU <- rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 8)
 
 dif_tab2$test <- tests
 dif_tab2$LU <- LU
 
-dif_tab2$model <- c(rep("SR", 6), rep("Abun", 6))
+dif_tab2$model <- c(rep("SR", 12), rep("Abun", 12))
 
 
 # save the results table
@@ -329,8 +330,8 @@ write.csv(dif_tab2, paste0(outdir, "/DifferencesTable_INSECTS.csv"), row.names =
 ##%######################################################%##
 
 
-#dif_tab <- read.csv(paste0(outdir, "/DifferencesTable_nogroup.csv"))
-
+#dif_tab <- read.csv(paste0(outdir, "/DifferencesTable_INSECTS.csv"))
+# dif_tab <- dif_tab2
 
 library(ggplot2)
 
@@ -348,53 +349,42 @@ theme_custom <- theme(panel.grid = element_blank(),
                       axis.title.y = element_blank())
 
 
-dif_tab$trop <- sub(".*_", "", dif_tab$model)
-dif_tab$metric <- sub("_.*", "", dif_tab$model)
-
-dif_tab$trop <- sub("trop", "Tropical", dif_tab$trop)
-dif_tab$trop <- sub("temp", "Non-tropical", dif_tab$trop)
-
-dif_tab$metric <- sub("abmod", "Total Abundance", dif_tab$metric)
-dif_tab$metric <- sub("srmod", "Species Richness", dif_tab$metric)
+dif_tab$model <- sub("Abun", "Total Abundance", dif_tab$model)
+dif_tab$model <- sub("SR", "Species Richness", dif_tab$model)
 
 # rename info
-dif_tab$test  <- sub(" range", "", dif_tab$test)
-dif_tab$test  <- sub("Minimal cropland to Intense cropland", "Use Intensity", dif_tab$test)
-dif_tab$test  <- sub("Intense Primary to Intense Cropland", "Land Use", dif_tab$test)
-dif_tab$test  <- sub("Percentage NH", "Percentage Natural\n Habitat", dif_tab$test)
-dif_tab$test  <- sub("Landcovers", "Number of\n Landcovers", dif_tab$test)
-dif_tab$test  <- sub("Fertiliser", "Total Fertiliser", dif_tab$test)
-dif_tab$test  <- sub("Distance", "Distance to Forest", dif_tab$test)
+dif_tab$test  <- sub("ncrop", "Number of crops", dif_tab$test)
+dif_tab$test  <- sub("pest_H", "Pesticide application (High)", dif_tab$test)
+dif_tab$test  <- sub("Fields", "Field size", dif_tab$test)
+dif_tab$test  <- sub("percNH", "Percentage natural habitat", dif_tab$test)
 
-dif_tab$test <- factor(dif_tab$test, levels = rev(c("Land Use", "Use Intensity", "Distance to Forest",
-                                                    "Percentage Natural\n Habitat", "Total Fertiliser",
-                                                    "Number of\n Landcovers", "Homogeneity")))
 
-dif_tab$trop <- factor(dif_tab$trop, levels = c("Tropical", "Non-tropical"))
+dif_tab$test <- factor(dif_tab$test, levels = rev(c("Number of crops",
+                                                    "Pesticide application (High)", "Field size",
+                                                    "Percentage natural habitat")))
 
-dif_tab$median[dif_tab$median == 0] <- NA
-dif_tab$lower[dif_tab$lower == 0] <- NA
-dif_tab$upper[dif_tab$upper == 0] <- NA
+dif_tab$model <- factor(dif_tab$model, levels = c("Total Abundance", "Species Richness"))
 
-dif_tab$metric <- factor(dif_tab$metric, levels = c("Total Abundance", "Species Richness"))
+dif_tab$LU <- factor(dif_tab$LU, levels = c("Primary vegetation", "Secondary vegetation", "Agriculture"))
 
 
 ggplot(data = dif_tab) + 
-  geom_point(aes(x = test, y = median, shape = trop, col = trop), position = position_dodge(width = 0.9), size = 2) +
-  geom_errorbar(aes(x = test, y = median, ymin = lower, ymax = upper, col = trop), 
+  geom_point(aes(x = test, y = median, col = LU), position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(x = test, y = median, ymin = lower, ymax = upper, col = LU), 
                 position = position_dodge2(padding = 0.5),
                 size = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
-  facet_wrap(~ metric) + coord_flip() +
+  facet_wrap(~ model) + coord_flip() +
   ylab("Percentage Change") + 
-  scale_color_manual(values = c("#66CDAA", "#27408B")) +
+  ylim(c(-100, 1000)) +
+  scale_color_manual(values = c("#006400", "#8B0000", "#EEAD0E")) +
   theme_bw() +
   theme_custom +
-  theme(strip.background = element_rect(fill = NA))
+  theme(strip.background = element_rect(fill = NA), legend.position = "bottom")
 
 
 
-ggsave(filename = paste0(outdir, "/Difference_plot.pdf"), width = 6.5, height = 3.5, unit = "in")  
+ggsave(filename = paste0(outdir, "/Difference_plot_INSECTS.pdf"), width = 6.5, height = 3.5, unit = "in")  
 
 
 
@@ -552,51 +542,249 @@ ggsave(p2, filename = paste0(outdir, "/ORDER_Abundance_LUUI_alternative.pdf"), w
 
 
 # predict the result
-results <- PredictGLMERRandIter(model = sr1$model, data = pred_tab)
+results <- PredictGLMERRandIter(model = sr1.or$model, data = pred_tab)
 
 # transform the results
 results <- exp(results)
 
-results <- sweep(x = results, MARGIN = 2, STATS = results[1,], FUN = '/')
+results <- as.data.frame(results)
+results$Order2 <- pred_tab$Order2
+results <- results %>% group_split(Order2)
 
-pred_tab$median <- ((apply(X = results, MARGIN = 1, FUN = median))*100)-100
-pred_tab$upper <- ((apply(X = results, MARGIN = 1, FUN = quantile,probs = 0.975))*100)-100
-pred_tab$lower <- ((apply(X = results, MARGIN = 1, FUN = quantile,probs = 0.025))*100)-100
+# remove order column
+results <- lapply(results, function(x) x[!(names(x) %in% c("Order2"))])
 
+# sweep so each order is relative to the primary veg value
+results <- lapply(results, function(x){ r <- as.matrix(x)
+sweep(x = as.matrix(r), MARGIN = 2, STATS = r[1,], FUN = '/')
+} )
+
+
+# recombine data
+result_all <- as.data.frame(do.call("rbind", results))
+
+pred_tab$median <- ((apply(X = result_all, MARGIN = 1, FUN = median))*100)-100
+pred_tab$upper <- ((apply(X = result_all, MARGIN = 1, FUN = quantile,probs = 0.975, na.rm = T))*100)-100
+pred_tab$lower <- ((apply(X = result_all, MARGIN = 1, FUN = quantile,probs = 0.025, na.rm = T))*100)-100
+
+
+# organise the data for plotting
 plot_data <- pred_tab
 
+# set to NA for primary vegetation as want this as a point only
 plot_data[plot_data$upper == 0, c("upper", "lower")] <- NA
 
+# edit for labelling
 plot_data$LU <- sub("Primary vegetation", "Primary\nvegetation", plot_data$LU)
 plot_data$LU <- sub("Secondary vegetation", "Secondary\nvegetation", plot_data$LU)
 
 plot_data$LU <- factor(plot_data$LU, levels = c("Primary\nvegetation", "Secondary\nvegetation", "Agriculture"))
 
-p2 <- ggplot(data = plot_data)+
-  geom_point(aes(x = LU, y = median, col = LU, shape = Use_intensity),
-             position = position_dodge(width = 0.9), size = 2) +
+p1 <- ggplot(data = plot_data)+
+  geom_point(aes(x = LU, y = median, col = LU),
+             position = position_dodge(width = 0.9), size = 1) +
   geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = LU, col = LU),
-                position = position_dodge2(padding = 0.5)) +
+                position = position_dodge2(padding = 0.5), width = 0.2, size = 0.5) +
+  facet_wrap(~Order2, nrow = 4) +
   scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
   geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
   xlab("") +
   ylab("Species Richness (%)") +
+  ylim(-200, 1000) + 
   theme_bw() +
   theme_custom + 
-  theme(legend.position = "none", strip.background = element_rect(fill = NA, size = 0.2))
+  theme(legend.position = c(0.8, 0.8), strip.background = element_rect(fill = NA, size = 0.2),
+        axis.text.x = element_text(angle = 50, hjust = 1, size = 8))
 
 
-cowplot::plot_grid(p1, p2, nrow = 2, labels = c("(a)", "(b)"), label_size = 10)
-
-ggsave(filename = paste0(outdir, "/All_insects_LUUI.pdf"), width = 4, height = 6, uni = "in")
+ggsave(p1, filename = paste0(outdir, "/ORDER_Richness_LUUI.pdf"), width = 6, height = 7, uni = "in")
 
 
+# alternative figure option
+
+p2 <- ggplot(data = plot_data)+
+  geom_point(aes(x = Order2, y = median, col = LU),
+             position = position_dodge(width = 0.9), size = 1) +
+  geom_errorbar(aes(ymin = lower, ymax = upper, y = median, x = Order2, col = LU),
+                position = position_dodge2(padding = 0.5)) +
+  #facet_wrap(~Order2, nrow = 4) +
+  scale_colour_manual(values = c("#006400", "#8B0000", "#EEAD0E"), guide = F)+
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2)+
+  xlab("") +
+  ylab("Species Richness (%)") +
+  ylim(-1000, 2500) + 
+  theme_bw() +
+  theme_custom + 
+  theme(legend.position = c(0.8, 0.8), strip.background = element_rect(fill = NA, size = 0.2),
+        axis.text.x = element_text(angle = 50, hjust = 1, size = 8))
 
 
+ggsave(p2, filename = paste0(outdir, "/ORDER_Richness_LUUI_alternative.pdf"), width = 4, height = 3, uni = "in")
 
 
+##%######################################################%##
+#                                                          #
+####              **intensity variables**               ####
+#                                                          #
+##%######################################################%##
 
 
+pred_tab <- data.frame(ncrop_RS = median(final.data.trans$ncrop_RS),
+                       pest_H_RS = median(final.data.trans$pest_H_RS),
+                       fields = "Medium",
+                       percNH_RS = median(final.data.trans$percNH_RS),
+                       Use_intensity = "Intense use",
+                       LU = "Agriculture",
+                       Order2 = levels(final.data.trans$Order2)[1],
+                       Species_richness = 0,
+                       logAbun = 0)
+
+pred_tab$LU <- factor(pred_tab$LU, levels = levels(ab1.or$data$LU))
+pred_tab$Use_intensity <- factor(pred_tab$Use_intensity, levels = levels(ab1.or$data$Use_intensity))
+pred_tab$fields <- factor(pred_tab$fields, levels = levels(ab1.or$data$fields))
+pred_tab$Order2 <- factor(pred_tab$Order2, levels = levels(ab1.or$data$Order2))
+
+
+# add and change factor levels of land use and intensity
+
+# create initial table
+pred_tab <- do.call("rbind", replicate(3, pred_tab, simplify = FALSE))
+
+pred_tab[1, 'LU'] <- "Primary vegetation"
+pred_tab[2, 'LU'] <- "Secondary vegetation"
+
+
+# pred_tab[c(2,5,8), 'Use_intensity'] <- "Light use"
+# pred_tab[c(3,6,9), 'Use_intensity'] <- "Intense use"
+
+# replicate and add orders
+pred_tab <- do.call("rbind", replicate(8, pred_tab, simplify = FALSE))
+# this is what we need for each order
+
+# range of ncrop, 0.0000 123
+pred_tab[1:3, 1] <- min(final.data.trans$ncrop_RS) #min(final.data.trans$ncrop)
+pred_tab[4:6, 1] <- max(final.data.trans$ncrop_RS)
+
+# range of pest_H, 0.0000 166.4538
+pred_tab[7:9, 2] <- min(final.data.trans$pest_H_RS) #min(final.data.trans$pest_H_RS)
+pred_tab[10:12, 2] <- max(final.data.trans$pest_H_RS) #max(final.data.trans$pest_H)
+
+# range of field size, very small - large (ignore no fields?)
+pred_tab[13:15, 3] <- "Very small" #min(final.data.trans$pest_H_RS)
+pred_tab[16:18, 3] <- "Large" #max(final.data.trans$pest_H)
+
+
+# range of percNH, just to see? 0.9 - 99
+pred_tab[19:21, 4] <- min(final.data.trans$percNH_RS) #min(final.data.trans$percNH)
+pred_tab[22:24, 4] <- max(final.data.trans$percNH_RS) #max(final.data.trans$percNH)
+
+
+#levels(pred_tab$Order2) # currently 15 Order groupings
+
+# now replicate for number of orders
+pred_tab <- do.call("rbind", replicate(15, pred_tab, simplify = FALSE))
+
+# add in the order names
+pred_tab$Order2 <- rep(levels(pred_tab$Order2), each = 24)
+
+
+# predict the result
+result_sr <- PredictGLMERRandIter(model = sr1.or$model, data = pred_tab, nIters = 10000)
+result_ab <- PredictGLMERRandIter(model = ab1.or$model, data = pred_tab, nIters = 10000)
+
+# transform the results
+result_sr <- exp(result_sr)
+result_ab <- exp(result_ab)-1
+
+allresults <- rbind(result_sr, result_ab)
+
+allresults <- as.data.frame(allresults)
+allresults$Order2 <- rep(pred_tab$Order2, 2)
+# split by order
+allresults <- allresults %>% group_split(Order2) #dplyr package
+
+# remove order column
+allresults <- lapply(allresults, function(x) x[!(names(x) %in% c("Order2"))])
+
+
+# calculate the percentage changes between start and end values between land uses
+
+
+# calculate the percentage differences between iterations
+# function to get percentage change from starting and ending values
+perc_change <- function(start, end){
+  
+  cng <- round(((end-start)/start)*100, 2)
+  return(cng)
+  
+}
+
+# empty space for result of perc change loop
+dif_tab <-  NULL
+
+
+# fill in differences, the starting values are the first set of 3, ending values the next set of 3
+# need to apply this to each table in the list
+
+for(j in 1:length(allresults)){
+  
+  order_tab <- allresults[[j]]
+  
+for(i in c(1:3, 7:9, 13:15, 19:21, 25:27, 31:33, 37:39, 43:45)){
+  
+  
+  # determine the percentage change across all iters
+  chng <- perc_change(order_tab[i,], order_tab[i+3,])
+  
+  if(length(grep(NaN, chng)) > 0){ # some orders have dodgy values, just set result to NA
+    
+    med_change <- NA
+    LCI_change <- NA
+    UCI_change <- NA
+    
+    dif_tab <- rbind(dif_tab, c(med_change, LCI_change, UCI_change))
+  
+  }else{
+  
+  med_change <- median(as.numeric(chng))
+  LCI_change <- quantile(chng, probs = 0.025)
+  UCI_change <- quantile(chng, probs = 0.975)
+  
+  dif_tab <- rbind(dif_tab, c(med_change, LCI_change, UCI_change)) }
+  
+  
+} # end of loop through table
+
+} # end of loop through lists
+
+# organise table
+
+dif_tab2 <- as.data.frame(dif_tab)
+#dif_tab2 <- do.call(rbind.data.frame, dif_tab2)
+
+
+colnames(dif_tab2) <- c("median", "lower", "upper")
+
+dif_tab2$median <- as.numeric(dif_tab2$median)
+dif_tab2$lower <- as.numeric(dif_tab2$lower)
+dif_tab2$upper <- as.numeric(dif_tab2$upper)
+
+# add details of tests
+tests <- rep(c("ncrop", 
+               "pest_H",
+               "Fields", 
+               "percNH"),each = 3, 2)
+
+LU <- rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 8)
+
+dif_tab2$test <- tests
+dif_tab2$LU <- LU
+
+dif_tab2$model <- c(rep("SR", 12), rep("Abun", 12))
+
+
+# save the results table
+write.csv(dif_tab2, paste0(outdir, "/DifferencesTable_INSECTS.csv"), row.names = F)
 
 
 
@@ -728,6 +916,191 @@ cowplot::plot_grid(p1, p2, nrow = 2, labels = c("(a)", "(b)"), label_size = 10)
 
 ggsave(filename = paste0(outdir, "/POLS_LUUI.pdf"), width = 4, height = 6, uni = "in")
 
+
+
+
+##%######################################################%##
+#                                                          #
+####          **intensity variables**                   ####
+#                                                          #
+##%######################################################%##
+
+# set up matrix
+pred_tab <- data.frame(ncrop_RS = median(final.data.trans.pols$ncrop_RS),
+                       pest_H_RS = median(final.data.trans.pols$pest_H_RS),
+                       fields = "Medium",
+                       percNH_RS = median(final.data.trans.pols$percNH_RS),
+                       Use_intensity = "Intense use",
+                       LU = "Agriculture",
+                       Species_richness = 0,
+                       logAbun = 0)
+
+# add factor levels
+pred_tab$LU <- factor(pred_tab$LU, levels = levels(ab1.pols$data$LU))
+pred_tab$Use_intensity <- factor(pred_tab$Use_intensity, levels = levels(ab1.pols$data$Use_intensity))
+pred_tab$fields <- factor(pred_tab$fields, levels = levels(ab1.pols$data$fields))
+
+
+# replicate the row for number for LUs
+pred_tab <- do.call("rbind", replicate(3, pred_tab, simplify = FALSE))
+pred_tab[1, 'LU'] <- "Primary vegetation"
+pred_tab[2, 'LU'] <- "Secondary vegetation"
+
+# replicate number of rows for variables
+pred_tab <- do.call("rbind", replicate(8, pred_tab, simplify = FALSE))
+
+# range of ncrop, 0.0000 123
+pred_tab[1:3, 1] <- min(final.data.trans.pols$ncrop_RS) #min(final.data.trans$ncrop)
+pred_tab[4:6, 1] <- max(final.data.trans.pols$ncrop_RS)
+
+# range of pest_H, 0.0000 166.4538
+pred_tab[7:9, 2] <- min(final.data.trans.pols$pest_H_RS) #min(final.data.trans$pest_H_RS)
+pred_tab[10:12, 2] <- max(final.data.trans.pols$pest_H_RS) #max(final.data.trans$pest_H)
+
+# range of field size, very small - large (ignore no fields?)
+pred_tab[13:15, 3] <- "Very small" #min(final.data.trans$pest_H_RS)
+pred_tab[16:18, 3] <- "Large" #max(final.data.trans$pest_H)
+
+
+# range of percNH, just to see? 0.9 - 99
+pred_tab[19:21, 4] <- min(final.data.trans.pols$percNH_RS) #min(final.data.trans$percNH)
+pred_tab[22:24, 4] <- max(final.data.trans.pols$percNH_RS) #max(final.data.trans$percNH)
+
+names(sr1$data)
+# predict the result
+result_sr <- PredictGLMERRandIter(model = sr1.pols$model, data = pred_tab, nIters = 10000)
+result_ab <- PredictGLMERRandIter(model = ab1.pols$model, data = pred_tab, nIters = 10000)
+
+# transform the results
+result_sr <- exp(result_sr)
+result_ab <- exp(result_ab)-1
+
+
+# calculate the percentage differences between iterations
+# function to get percentage change from starting and ending values
+perc_change <- function(start, end){
+  
+  cng <- round(((end-start)/start)*100, 2)
+  return(cng)
+  
+}
+
+allresults <- rbind(result_sr, result_ab)
+
+dif_tab <-  NULL
+
+
+# fill in differences
+for(i in c(1:3, 7:9, 13:15, 19:21, 25:27, 31:33, 37:39, 43:45)){
+  
+  
+  # determine the percentage change across all iters
+  chng <- perc_change(allresults[i,], allresults[i+3,])
+  
+  med_change <- median(as.numeric(chng))
+  LCI_change <- quantile(chng, probs = 0.025)
+  UCI_change <- quantile(chng, probs = 0.975)
+  
+  dif_tab<- rbind(dif_tab, c(med_change, LCI_change, UCI_change))
+  
+  
+}
+
+
+
+# organise table
+
+dif_tab2 <- as.data.frame(dif_tab)
+#dif_tab2 <- do.call(rbind.data.frame, dif_tab2)
+
+
+colnames(dif_tab2) <- c("median", "lower", "upper")
+
+dif_tab2$median <- as.numeric(dif_tab2$median)
+dif_tab2$lower <- as.numeric(dif_tab2$lower)
+dif_tab2$upper <- as.numeric(dif_tab2$upper)
+
+# add details of tests
+tests <- rep(c("ncrop", 
+               "pest_H",
+               "Fields", 
+               "percNH"),each = 3, 2)
+
+LU <- rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 8)
+
+dif_tab2$test <- tests
+dif_tab2$LU <- LU
+
+dif_tab2$model <- c(rep("SR", 12), rep("Abun", 12))
+
+
+# save the results table
+write.csv(dif_tab2, paste0(outdir, "/DifferencesTable_POLS.csv"), row.names = F)
+
+
+
+##%######################################################%##
+#                                                          #
+####        Create figure to present differences        ####
+#                                                          #
+##%######################################################%##
+
+
+#dif_tab <- read.csv(paste0(outdir, "/DifferencesTable_INSECTS.csv"))
+dif_tab <- dif_tab2
+
+library(ggplot2)
+
+theme_custom <- theme(panel.grid = element_blank(),
+                      legend.position = c(0.8,0.8), legend.title = element_blank(),
+                      legend.text = element_text(size = 10),
+                      axis.text = element_text(size = 10),
+                      axis.title = element_text(size = 10),
+                      aspect.ratio = 1, legend.background = element_blank(),
+                      #text = element_text(size = 8), 
+                      line = element_line(size = 0.2), 
+                      panel.border = element_rect(size = 0.2),
+                      strip.background = element_rect(size = 0.2),
+                      axis.ticks = element_line(size = 0.2),
+                      axis.title.y = element_blank())
+
+
+dif_tab$model <- sub("Abun", "Total Abundance", dif_tab$model)
+dif_tab$model <- sub("SR", "Species Richness", dif_tab$model)
+
+# rename info
+dif_tab$test  <- sub("ncrop", "Number of crops", dif_tab$test)
+dif_tab$test  <- sub("pest_H", "Pesticide application (High)", dif_tab$test)
+dif_tab$test  <- sub("Fields", "Field size", dif_tab$test)
+dif_tab$test  <- sub("percNH", "Percentage natural habitat", dif_tab$test)
+
+
+dif_tab$test <- factor(dif_tab$test, levels = rev(c("Number of crops",
+                                                    "Pesticide application (High)", "Field size",
+                                                    "Percentage natural habitat")))
+
+dif_tab$model <- factor(dif_tab$model, levels = c("Total Abundance", "Species Richness"))
+
+dif_tab$LU <- factor(dif_tab$LU, levels = c("Primary vegetation", "Secondary vegetation", "Agriculture"))
+
+
+ggplot(data = dif_tab) + 
+  geom_point(aes(x = test, y = median, col = LU), position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(x = test, y = median, ymin = lower, ymax = upper, col = LU), 
+                position = position_dodge2(padding = 0.5),
+                size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
+  facet_wrap(~ model) + coord_flip() +
+  ylab("Percentage Change") + 
+  ylim(c(-100, 1500)) +
+  scale_color_manual(values = c("#006400", "#8B0000", "#EEAD0E")) +
+  theme_bw() +
+  theme_custom +
+  theme(strip.background = element_rect(fill = NA), legend.position = "bottom")
+
+
+
+ggsave(filename = paste0(outdir, "/Difference_plot_POLS.pdf"), width = 6.5, height = 3.5, unit = "in")  
 
 
 
@@ -865,6 +1238,190 @@ ggsave(filename = paste0(outdir, "/PCS_LUUI.pdf"), width = 4, height = 6, uni = 
 
 
 
+
+##%######################################################%##
+#                                                          #
+####          **intensity variables**                   ####
+#                                                          #
+##%######################################################%##
+
+
+# set up matrix
+pred_tab <- data.frame(ncrop_RS = median(final.data.trans.pc$ncrop_RS),
+                       pest_H_RS = median(final.data.trans.pc$pest_H_RS),
+                       fields = "Medium",
+                       percNH_RS = median(final.data.trans.pc$percNH_RS),
+                       Use_intensity = "Intense use",
+                       LU = "Agriculture",
+                       Species_richness = 0,
+                       logAbun = 0)
+
+# add factor levels
+pred_tab$LU <- factor(pred_tab$LU, levels = levels(ab1.pc$data$LU))
+pred_tab$Use_intensity <- factor(pred_tab$Use_intensity, levels = levels(ab1.pc$data$Use_intensity))
+pred_tab$fields <- factor(pred_tab$fields, levels = levels(ab1.pc$data$fields))
+
+
+# replicate the row for number for LUs
+pred_tab <- do.call("rbind", replicate(3, pred_tab, simplify = FALSE))
+pred_tab[1, 'LU'] <- "Primary vegetation"
+pred_tab[2, 'LU'] <- "Secondary vegetation"
+
+# replicate number of rows for variables
+pred_tab <- do.call("rbind", replicate(8, pred_tab, simplify = FALSE))
+
+# range of ncrop, 0.0000 123
+pred_tab[1:3, 1] <- min(final.data.trans.pc$ncrop_RS) #min(final.data.trans$ncrop)
+pred_tab[4:6, 1] <- max(final.data.trans.pc$ncrop_RS)
+
+# range of pest_H, 0.0000 166.4538
+pred_tab[7:9, 2] <- min(final.data.trans.pc$pest_H_RS) #min(final.data.trans$pest_H_RS)
+pred_tab[10:12, 2] <- max(final.data.trans.pc$pest_H_RS) #max(final.data.trans$pest_H)
+
+# range of field size, very small - large (ignore no fields?)
+pred_tab[13:15, 3] <- "Very small" #min(final.data.trans$pest_H_RS)
+pred_tab[16:18, 3] <- "Large" #max(final.data.trans$pest_H)
+
+
+# range of percNH, just to see? 0.9 - 99
+pred_tab[19:21, 4] <- min(final.data.trans.pc$percNH_RS) #min(final.data.trans$percNH)
+pred_tab[22:24, 4] <- max(final.data.trans.pc$percNH_RS) #max(final.data.trans$percNH)
+
+names(sr1$data)
+# predict the result
+result_sr <- PredictGLMERRandIter(model = sr1.pc$model, data = pred_tab, nIters = 10000)
+result_ab <- PredictGLMERRandIter(model = sr1.pc$model, data = pred_tab, nIters = 10000)
+
+# transform the results
+result_sr <- exp(result_sr)
+result_ab <- exp(result_ab)-1
+
+
+# calculate the percentage differences between iterations
+# function to get percentage change from starting and ending values
+perc_change <- function(start, end){
+  
+  cng <- round(((end-start)/start)*100, 2)
+  return(cng)
+  
+}
+
+allresults <- rbind(result_sr, result_ab)
+
+dif_tab <-  NULL
+
+
+# fill in differences
+for(i in c(1:3, 7:9, 13:15, 19:21, 25:27, 31:33, 37:39, 43:45)){
+  
+  
+  # determine the percentage change across all iters
+  chng <- perc_change(allresults[i,], allresults[i+3,])
+  
+  med_change <- median(as.numeric(chng))
+  LCI_change <- quantile(chng, probs = 0.025)
+  UCI_change <- quantile(chng, probs = 0.975)
+  
+  dif_tab<- rbind(dif_tab, c(med_change, LCI_change, UCI_change))
+  
+  
+}
+
+
+
+# organise table
+
+dif_tab2 <- as.data.frame(dif_tab)
+#dif_tab2 <- do.call(rbind.data.frame, dif_tab2)
+
+
+colnames(dif_tab2) <- c("median", "lower", "upper")
+
+dif_tab2$median <- as.numeric(dif_tab2$median)
+dif_tab2$lower <- as.numeric(dif_tab2$lower)
+dif_tab2$upper <- as.numeric(dif_tab2$upper)
+
+# add details of tests
+tests <- rep(c("ncrop", 
+               "pest_H",
+               "Fields", 
+               "percNH"),each = 3, 2)
+
+LU <- rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 8)
+
+dif_tab2$test <- tests
+dif_tab2$LU <- LU
+
+dif_tab2$model <- c(rep("SR", 12), rep("Abun", 12))
+
+
+# save the results table
+write.csv(dif_tab2, paste0(outdir, "/DifferencesTable_PCScsv"), row.names = F)
+
+
+
+##%######################################################%##
+#                                                          #
+####        Create figure to present differences        ####
+#                                                          #
+##%######################################################%##
+
+
+#dif_tab <- read.csv(paste0(outdir, "/DifferencesTable_INSECTS.csv"))
+dif_tab <- dif_tab2
+
+library(ggplot2)
+
+theme_custom <- theme(panel.grid = element_blank(),
+                      legend.position = c(0.8,0.8), legend.title = element_blank(),
+                      legend.text = element_text(size = 10),
+                      axis.text = element_text(size = 10),
+                      axis.title = element_text(size = 10),
+                      aspect.ratio = 1, legend.background = element_blank(),
+                      #text = element_text(size = 8), 
+                      line = element_line(size = 0.2), 
+                      panel.border = element_rect(size = 0.2),
+                      strip.background = element_rect(size = 0.2),
+                      axis.ticks = element_line(size = 0.2),
+                      axis.title.y = element_blank())
+
+
+dif_tab$model <- sub("Abun", "Total Abundance", dif_tab$model)
+dif_tab$model <- sub("SR", "Species Richness", dif_tab$model)
+
+# rename info
+dif_tab$test  <- sub("ncrop", "Number of crops", dif_tab$test)
+dif_tab$test  <- sub("pest_H", "Pesticide application (High)", dif_tab$test)
+dif_tab$test  <- sub("Fields", "Field size", dif_tab$test)
+dif_tab$test  <- sub("percNH", "Percentage natural habitat", dif_tab$test)
+
+
+dif_tab$test <- factor(dif_tab$test, levels = rev(c("Number of crops",
+                                                    "Pesticide application (High)", "Field size",
+                                                    "Percentage natural habitat")))
+
+dif_tab$model <- factor(dif_tab$model, levels = c("Total Abundance", "Species Richness"))
+
+dif_tab$LU <- factor(dif_tab$LU, levels = c("Primary vegetation", "Secondary vegetation", "Agriculture"))
+
+
+ggplot(data = dif_tab) + 
+  geom_point(aes(x = test, y = median, col = LU), position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(x = test, y = median, ymin = lower, ymax = upper, col = LU), 
+                position = position_dodge2(padding = 0.5),
+                size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
+  facet_wrap(~ model) + coord_flip() +
+  ylab("Percentage Change") + 
+  ylim(c(-100, 1500)) +
+  scale_color_manual(values = c("#006400", "#8B0000", "#EEAD0E")) +
+  theme_bw() +
+  theme_custom +
+  theme(strip.background = element_rect(fill = NA), legend.position = "bottom")
+
+
+
+ggsave(filename = paste0(outdir, "/Difference_plot_PCS.pdf"), width = 6.5, height = 3.5, unit = "in")  
 
 
 

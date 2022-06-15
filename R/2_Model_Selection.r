@@ -79,9 +79,13 @@ model_struc <- "LU + Use_intensity + fields + pest_H_RS + ncrop_RS + percNH_RS +
   
 # Non selection version to assess all variables
 
-ab1 <- GLMER(modelData = model_data,responseVar = "logAbun",fitFamily = "gaussian",
-      fixedStruct = model_struc,
-      randomStruct = "(1|SS)+(1|SSB)")
+ab1 <- GLMER(modelData = model_data,
+             responseVar = "logAbun",
+             fitFamily = "gaussian",
+             fixedStruct = model_struc,
+             randomStruct = "(1|SS)+(1|SSB)", 
+             #optimizer = "Nelder_Mead", 
+             maxIters = 50000)
 
 summary(ab1$model)
 
@@ -118,11 +122,27 @@ sr1.or <- GLMER(modelData = final.data.trans,
              fixedStruct = model_struc,
              randomStruct = "(1|SS)+(1|SSB)+(1|SSBS)"
              , 
-             #optimizer = "Nelder_Mead", 
-             maxIters = 50000
+             optimizer = "Nelder_Mead", 
+             maxIters = 10000 # trying fewer than others as this model crashed. 
              )
 # all interactions: 
 # fixed-effect model matrix is rank deficient so dropping 190 columns / coefficients
+# Warning messages:
+#   1: In commonArgs(par, fn, control, environment()) :
+#   maxfun < 10 * length(par)^2 is not recommended.
+# 2: In optwrap(optimizer, devfun, start, rho$lower, control = control,  :
+#                 convergence code 1 from bobyqa: bobyqa -- maximum number of function evaluations exceeded
+#               3: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#                                 unable to evaluate scaled gradient
+#                               4: In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :
+#                                                 Model failed to converge: degenerate  Hessian with 37 negative eigenvalues
+
+
+# error when using Nelder Mead
+# fixed-effect model matrix is rank deficient so dropping 190 columns / coefficients
+# Error in pwrssUpdate(pp, resp, tol = tolPwrss, GQmat = GQmat, compDev = compDev,  : 
+#                        Downdated VtV is not positive definite
+
 
 summary(sr1.or$model)
 
