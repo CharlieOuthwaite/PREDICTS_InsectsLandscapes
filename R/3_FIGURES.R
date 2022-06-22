@@ -770,23 +770,115 @@ dif_tab2$lower <- as.numeric(dif_tab2$lower)
 dif_tab2$upper <- as.numeric(dif_tab2$upper)
 
 # add details of tests
-tests <- rep(c("ncrop", 
+tests <- rep(rep(c("ncrop", 
                "pest_H",
                "Fields", 
-               "percNH"),each = 3, 2)
+               "percNH"),each = 3, 2), 15)
 
-LU <- rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 8)
+LU <- rep(rep(c("Primary vegetation", "Secondary vegetation", "Agriculture"), 8), 15)
 
 dif_tab2$test <- tests
 dif_tab2$LU <- LU
 
-dif_tab2$model <- c(rep("SR", 12), rep("Abun", 12))
+dif_tab2$model <- rep(c(rep("SR", 12), rep("Abun", 12)), 15)
+
+dif_tab2$Order <- pred_tab$Order2
 
 
 # save the results table
-write.csv(dif_tab2, paste0(outdir, "/DifferencesTable_INSECTS.csv"), row.names = F)
+write.csv(dif_tab2, paste0(outdir, "/DifferencesTable_ORDERS.csv"), row.names = F)
 
 
+
+##%######################################################%##
+#                                                          #
+####        Create figure to present differences        ####
+#                                                          #
+##%######################################################%##
+
+
+#dif_tab <- read.csv(paste0(outdir, "/DifferencesTable_ORDERS.csv"))
+dif_tab <- dif_tab2
+
+theme_custom <- theme(panel.grid = element_blank(),
+                      legend.position = c(0.8,0.8), legend.title = element_blank(),
+                      legend.text = element_text(size = 10),
+                      axis.text = element_text(size = 10),
+                      axis.title = element_text(size = 10),
+                      aspect.ratio = 1, legend.background = element_blank(),
+                      #text = element_text(size = 8), 
+                      line = element_line(size = 0.2), 
+                      panel.border = element_rect(size = 0.2),
+                      strip.background = element_rect(size = 0.2),
+                      axis.ticks = element_line(size = 0.2),
+                      axis.title.y = element_blank())
+
+
+dif_tab$model <- sub("Abun", "Total Abundance", dif_tab$model)
+dif_tab$model <- sub("SR", "Species Richness", dif_tab$model)
+
+# rename info
+dif_tab$test  <- sub("ncrop", "Number of crops", dif_tab$test)
+dif_tab$test  <- sub("pest_H", "Pesticide application (High)", dif_tab$test)
+dif_tab$test  <- sub("Fields", "Field size", dif_tab$test)
+dif_tab$test  <- sub("percNH", "Percentage natural habitat", dif_tab$test)
+
+
+dif_tab$test <- factor(dif_tab$test, levels = rev(c("Number of crops",
+                                                    "Pesticide application (High)", "Field size",
+                                                    "Percentage natural habitat")))
+
+dif_tab$model <- factor(dif_tab$model, levels = c("Total Abundance", "Species Richness"))
+
+dif_tab$LU <- factor(dif_tab$LU, levels = c("Primary vegetation", "Secondary vegetation", "Agriculture"))
+
+dif_tab$Order <- factor(dif_tab$Order)
+
+
+ggplot(data = dif_tab) + 
+  geom_point(aes(x = test, y = median, col = LU), position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(x = test, y = median, ymin = lower, ymax = upper, col = LU), 
+                position = position_dodge2(padding = 0.5),
+                size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
+  facet_wrap(Order ~ model) + coord_flip() +
+  ylab("Percentage Change") + 
+  ylim(c(-500, 1500)) +
+  scale_color_manual(values = c("#006400", "#8B0000", "#EEAD0E")) +
+  theme_bw() +
+  theme_custom +
+  theme(strip.background = element_rect(fill = NA), legend.position = "bottom")
+
+
+
+ggsave(filename = paste0(outdir, "/Difference_plot_ORDERS_All.pdf"), width = 10, height = 12, unit = "in")  
+
+
+# separate plot for each order - easier to read than the above
+for(order in unique(dif_tab$Order)){
+  
+  plot_data <- dif_tab[dif_tab$Order == order, ]
+  
+p1 <- ggplot(data = plot_data) + 
+  geom_point(aes(x = test, y = median, col = LU), position = position_dodge(width = 0.9), size = 2) +
+  geom_errorbar(aes(x = test, y = median, ymin = lower, ymax = upper, col = LU), 
+                position = position_dodge2(padding = 0.5),
+                size = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.2) +
+  facet_wrap(~model) + coord_flip() +
+  ylab("Percentage Change") + 
+  ylim(c(-1000, 1500)) +
+  scale_color_manual(values = c("#006400", "#8B0000", "#EEAD0E")) +
+  theme_bw() +
+  theme_custom +
+  theme(strip.background = element_rect(fill = NA), legend.position = "bottom")
+
+
+
+ggsave(p1, filename = paste0(outdir, "/Difference_plot_", order, ".pdf"), width = 6.5, height = 3.5, unit = "in")  
+
+
+}
 
 ##%######################################################%##
 #                                                          #
